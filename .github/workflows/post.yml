@@ -1,0 +1,61 @@
+name: Post to Instagram
+
+on:
+  schedule:
+    # Every day at 13:17 UTC. Change the cron line to change the cadence.
+    - cron: "17 13 * * *"
+  workflow_dispatch:
+    inputs:
+      count:
+        description: How many posts to publish
+        default: "1"
+      dry_run:
+        description: Only show what would be posted
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: instagram-post
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Publish next item(s)
+        env:
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
+          IG_API_BASE: ${{ vars.IG_API_BASE }}
+          IG_API_VERSION: ${{ vars.IG_API_VERSION }}
+          DEFAULT_CAPTION: ${{ vars.DEFAULT_CAPTION }}
+          COUNT: ${{ inputs.count || '1' }}
+          DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: python -m autoupload post --count "$COUNT" $DRY_RUN
+
+      - name: Record what was posted
+        # Runs even if a later item failed, so a published post is never re-sent.
+        if: always()
+        run: |
+          git add -A queue posted failed 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "Nothing to record."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update Instagram queue after posting"
+          git pull --rebase
+          git push
