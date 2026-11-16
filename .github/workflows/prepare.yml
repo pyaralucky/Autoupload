@@ -1,0 +1,32 @@
+name: Prepare queue
+
+# When you add files to queue/, fix the images, draft missing captions and
+# refresh QUEUE.md straight away so you can review them before they go out.
+on:
+  push:
+    paths: ["queue/**", "autoupload.toml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: autoupload-queue
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python -m autoupload prepare
+      - run: .github/scripts/commit.sh "Prepare Instagram queue"

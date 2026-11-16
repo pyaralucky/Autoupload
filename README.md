@@ -1,48 +1,123 @@
 # Autoupload
 
-Drop images into a folder, and they get posted to Instagram on a schedule.
+Drop images and videos into a folder and they get posted to Instagram on a
+schedule: feed posts, carousels, Reels and Stories.
 
 It uses Instagram's official content publishing API (no password, no browser
 automation) and runs on GitHub Actions, so there is no server to maintain.
 
 ## How it works
 
-1. You commit JPEGs to `queue/`.
-2. Once a day a GitHub Actions workflow takes the first item (by filename),
-   publishes it, and moves it to `posted/` with a line in `posted/log.jsonl`
-   holding the Instagram link.
-3. Anything Instagram can never accept (wrong format, bad aspect ratio, ...)
-   is moved to `failed/` with the reason in `failed/log.jsonl`, so one bad
-   file never blocks the queue.
+1. You commit files to `queue/`.
+2. Straight away, the **Prepare queue** workflow converts and resizes images
+   that Instagram would reject, drafts captions if you enabled AI captions,
+   and refreshes [`QUEUE.md`](QUEUE.md), a preview of what goes out when.
+3. Every hour the **Post to Instagram** workflow checks whether a posting slot
+   from `autoupload.toml` has come due. If so it publishes the next item and
+   moves it to `posted/`, logging the link in `posted/log.jsonl`.
+4. An item Instagram can never accept is moved to `failed/` with the reason,
+   so one bad file never blocks the queue.
+5. You are told when something needs you: a GitHub issue is opened when a run
+   fails, an item is rejected, or the queue is running low.
 
-Instagram does not accept uploads; it downloads each image from a public URL.
-On a **public** repository the workflow uses the file's
-`raw.githubusercontent.com` address automatically. On a **private** repository
-you must host the images somewhere public and set `PUBLIC_BASE_URL` (see
-[Settings](#settings)).
+Instagram does not accept uploads; it downloads each file from a public URL.
+On a **public** repository the file's `raw.githubusercontent.com` address is
+used automatically. On a **private** repository you must host the files
+somewhere public and set `PUBLIC_BASE_URL` (see [Secrets and variables](#secrets-and-variables)).
 
-## Queue format
+## The queue
 
 ```
 queue/
-  001-sunrise.jpg        single-image post
-  001-sunrise.txt        its caption (optional)
-  002-trip/              carousel post: 2-10 JPEGs, shown in filename order
+  001-sunrise.jpg          image post
+  001-sunrise.txt          its caption (optional)
+  002-trip/                carousel: 2-10 images or videos, in filename order
     a.jpg
     b.jpg
-    caption.txt          its caption (optional)
+    caption.txt
+  003-clip.mp4             Reel
+  2026-12-25-xmas.jpg      held until 25 December
+  stories/                 everything in here is posted as a Story
+    teaser.jpg
 ```
 
-Name files with a numeric or date prefix to control the order.
+- **Order.** Items go out in filename order, so prefix names with numbers.
+- **Dates.** A name starting `YYYY-MM-DD` (optionally `YYYY-MM-DD-HHMM`) is
+  held until then, and goes out at the first slot after it, ahead of undated
+  items. Dates are read in the timezone from `autoupload.toml`.
+- **Formats.** JPEG, PNG, WebP, HEIC, GIF, BMP and TIFF images (all converted
+  to JPEG, which is the only format Instagram takes), and MP4/MOV video.
+- **Stories** take no caption and are not cross-posted. They use a posting
+  slot like any other item.
 
-Instagram's rules, checked before anything is sent:
+### What gets fixed automatically
 
-| Rule | Limit |
+| Problem | Fix |
 | --- | --- |
-| Format | JPEG only |
-| File size | 8 MB |
-| Aspect ratio | between 4:5 (portrait) and 1.91:1 (landscape) |
-| Caption | 2,200 characters, 30 hashtags |
+| Not a JPEG | Converted; transparency is filled with `pad_color` |
+| Aspect ratio outside 4:5 to 1.91:1 | Padded with borders, or cropped if `fit = "crop"` |
+| Wider than 1440 px or over 8 MB | Scaled down and recompressed |
+| Phone photo stored sideways | Rotated upright |
+
+Fixed files replace the originals in `queue/`; the originals remain in git
+history. Videos are never modified, so they must already meet Instagram's
+requirements (MP4/MOV, H.264 or HEVC, AAC audio; Reels 9:16 recommended) and
+be under 100 MB, GitHub's file limit.
+
+### Caption files
+
+The caption is the text of the `.txt` file. Lines starting with `@` set
+options and are not published:
+
+```
+Golden hour at the lake.
+
+@alt: Orange sunrise reflected in a still lake
+@location: 106078429431815
+@comment: Shot on a 35mm lens
+@crosspost: off
+```
+
+| Line | Effect |
+| --- | --- |
+| `@alt:` | Alt text for screen readers. Repeat it once per image in a carousel. Images only. |
+| `@location:` | Tags a place. The value is the Facebook Page id of the location. |
+| `@comment:` | Posted as the first comment after publishing. |
+| `@crosspost: off` | Keep this item on Instagram only. |
+
+Limits checked before posting: 2,200 characters and 30 hashtags, counted
+after the footer and hashtag set are added.
+
+## Settings: `autoupload.toml`
+
+Every option is in the file with its default. The main ones:
+
+```toml
+[schedule]
+timezone = "Asia/Kolkata"
+slots = ["09:00", "18:30"]       # one post per slot, every day
+jitter_minutes = 10              # random delay so posts don't hit the same minute
+
+[schedule.days]                  # optional per-weekday override
+sat = ["11:00"]
+sun = []                         # no posts on Sunday
+
+[caption]
+footer = "Prints available, link in bio."
+hashtag_sets = [["#art", "#daily"], ["#sketch", "#ink"]]   # rotated per post
+hashtags_in_first_comment = true
+
+[ai]
+enabled = true
+voice = "Warm, short, first person, no emoji."
+
+[crosspost]
+facebook = true
+threads = true
+```
+
+The first scheduled run after installing only starts the clock; the first
+post goes out at the next slot.
 
 ## Setup
 
@@ -53,64 +128,110 @@ cannot publish through the API).
 
 1. Create an app at <https://developers.facebook.com/apps> and add the
    Instagram product.
-2. Generate a long-lived access token for your account with the
-   `instagram_business_content_publish` permission (Instagram Login), or
-   `instagram_content_publish` (Facebook Login with a linked Page).
+2. Generate a long-lived access token for your account. Permissions:
+
+   | Feature | Instagram Login | Facebook Login |
+   | --- | --- | --- |
+   | Posting | `instagram_business_content_publish` | `instagram_content_publish` |
+   | First comment | `instagram_business_manage_comments` | `instagram_manage_comments` |
+   | Insights report | `instagram_business_manage_insights` | `instagram_manage_insights` |
+
 3. Note your Instagram user id, shown next to the token.
+4. If your token came from Instagram Login, set the variable `IG_API_BASE` to
+   `https://graph.instagram.com`.
 
-Long-lived tokens expire after about 60 days. Refresh the token before then
-and update the secret, or the workflow will start failing with an auth error.
+### 2. Secrets and variables
 
-### 2. Repository secrets
+Add these under **Settings → Secrets and variables → Actions**. Only the
+first two are required; add the others for the features you want.
 
-In **Settings → Secrets and variables → Actions** add:
-
-| Secret | Value |
+| Secret | For |
 | --- | --- |
-| `IG_USER_ID` | your Instagram user id |
-| `IG_ACCESS_TOKEN` | the long-lived token |
+| `IG_USER_ID`, `IG_ACCESS_TOKEN` | Posting (required) |
+| `GH_SECRETS_TOKEN` | Automatic token refresh: a fine-grained GitHub token for this repository with **Secrets: read and write** |
+| `FB_APP_ID`, `FB_APP_SECRET` | Token refresh, Facebook Login tokens only |
+| `ANTHROPIC_API_KEY` | AI captions |
+| `FB_PAGE_ID`, `FB_PAGE_ACCESS_TOKEN` | Cross-posting to a Facebook Page (`pages_manage_posts`) |
+| `THREADS_USER_ID`, `THREADS_ACCESS_TOKEN` | Cross-posting to Threads (`threads_content_publish`) |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Alerts by Telegram as well as GitHub issues |
 
-### 3. Enable the schedule
+| Variable | Purpose |
+| --- | --- |
+| `PUBLIC_BASE_URL` | Public HTTPS address serving this repository's files, e.g. `https://cdn.example.com/autoupload`. A file at `queue/a.jpg` must be at `<PUBLIC_BASE_URL>/queue/a.jpg`. Required for private repositories and local runs. |
+| `IG_API_BASE` | `https://graph.facebook.com` (default) or `https://graph.instagram.com` |
+| `IG_API_VERSION` | Graph API version, default `v24.0` |
+
+### 3. Turn it on
 
 Scheduled workflows only run from the default branch, so this code has to be
-on it. The schedule lives in `.github/workflows/post.yml`
-(`cron: "17 13 * * *"`, daily at 13:17 UTC); edit that line to change it.
+on it. To test, open **Actions → Post to Instagram → Run workflow** and tick
+**dry_run**: it lists what would be posted without posting. Run it without
+dry_run to publish immediately, outside the schedule.
 
-To test, open **Actions → Post to Instagram → Run workflow** and tick
-**dry_run**: it lists what would be posted without posting.
+## Features in detail
 
-## Settings
+**Token refresh.** Long-lived tokens expire after about 60 days. The *Refresh
+Instagram token* workflow renews the token twice a month and writes it back
+to the `IG_ACCESS_TOKEN` secret. Without `GH_SECRETS_TOKEN` it cannot save
+the token and opens an issue instead; you would then replace the secret by
+hand.
 
-Secrets are above. These optional values go under **Variables** in the same
-settings page (or in `.env` for local runs):
+**AI captions.** With `[ai] enabled = true`, Claude looks at each image that
+has no caption file and writes one into the queue as a normal `.txt` file.
+You can edit it before it is posted; an existing caption file is never
+overwritten. Each caption is one API call billed to your Anthropic account.
+Videos are not captioned.
 
-| Name | Purpose |
-| --- | --- |
-| `PUBLIC_BASE_URL` | Public HTTPS address serving this repository's files, e.g. `https://cdn.example.com/autoupload`. An image at `queue/a.jpg` must be at `<PUBLIC_BASE_URL>/queue/a.jpg`. Required for private repositories and local runs. |
-| `IG_API_BASE` | `https://graph.facebook.com` (default) or `https://graph.instagram.com` for tokens from Instagram Login. |
-| `IG_API_VERSION` | Graph API version, default `v24.0`. |
-| `DEFAULT_CAPTION` | Caption for items that have no caption file. |
+**Cross-posting.** After an item is live on Instagram it is also published to
+the Facebook Page and/or Threads. Threads text is cut to 500 characters. If a
+cross-post fails, the Instagram post stays up and you get an alert.
+
+**Alerts.** Issues are labelled `autoupload`. The same alert is not repeated
+while its issue is open and less than `repeat_hours` old; close the issue
+once you have dealt with it.
+
+**Insights.** Every Monday the *Insights report* workflow writes
+[`reports/insights.md`](reports/insights.md): reach, views, likes, comments,
+saves and shares for the last 30 days of posts, plus average reach by hour
+and weekday posted. Stories are excluded because their metrics expire after a
+day.
+
+**Queue preview.** [`QUEUE.md`](QUEUE.md) shows the upcoming grid and each
+post with its estimated time, final caption, first comment and any problems.
+GitHub renders it with the images.
 
 ## Running locally
 
 ```
 pip install -r requirements.txt
-cp .env.example .env        # fill in the values
+cp .env.example .env                  # fill in the values
 
-python -m autoupload list            # show and validate the queue
-python -m autoupload check           # verify the credentials
-python -m autoupload post --dry-run  # preview
-python -m autoupload post --count 2  # publish the next two items
+python -m autoupload list             # show and validate the queue
+python -m autoupload prepare          # fix images, draft captions, write QUEUE.md
+python -m autoupload check            # verify the credentials
+python -m autoupload post --dry-run   # preview
+python -m autoupload post --count 2   # publish the next two items now
+python -m autoupload insights         # write reports/insights.md
+python -m autoupload refresh-token --check-only
 ```
 
 Tests: `python -m unittest discover -s tests`
 
 ## When a run fails
 
-A red workflow run means nothing was lost: the item stays in `queue/` and is
-retried next time. Common causes:
+Nothing is lost: the item stays in `queue/` and is retried at the next run.
 
-- **Auth error (code 190)**: the token expired; generate a new one.
-- **Image URL returned HTTP 404**: the repository is private or the image is
+- **Auth error (code 190)**: the token expired or was revoked; generate a new
+  one and update the secret.
+- **Media URL returned HTTP 404**: the repository is private or the file is
   not pushed; see `PUBLIC_BASE_URL`.
 - **Rate limit**: Instagram caps API publishing per account per 24 hours.
+- **Missing permission**: a feature such as first comments or insights needs
+  an extra permission on the token; see the table above.
+
+## Cost
+
+On a public repository GitHub Actions is free. On a private one the hourly
+check uses roughly 700 to 1,500 of the 2,000 free minutes a month; to use
+fewer, narrow the `cron` line in `.github/workflows/post.yml` to the hours
+around your slots.

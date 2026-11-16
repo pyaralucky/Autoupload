@@ -1,0 +1,42 @@
+# Autoupload settings. Every value shown is the default; change what you need.
+# Secrets (tokens, keys) never go here: see the README.
+
+[schedule]
+timezone = "UTC"            # e.g. "Asia/Kolkata", "Europe/London", "America/New_York"
+slots = ["13:17"]           # posting times, every day; one post per slot
+jitter_minutes = 0          # wait a random 0..N minutes so posts don't land on the same minute
+
+# Different times on particular weekdays (mon tue wed thu fri sat sun).
+# An empty list means no posts that day.
+# [schedule.days]
+# sat = ["10:00", "18:00"]
+# sun = []
+
+[caption]
+default = ""                          # used when an item has no caption file
+footer = ""                           # appended to every caption
+hashtag_sets = []                     # e.g. [["#art", "#daily"], ["#sketch", "#ink"]]; rotated per post
+hashtags_in_first_comment = false     # true: post the hashtag set as the first comment instead
+
+[images]
+fit = "pad"                 # images outside 4:5..1.91:1: "pad" adds borders, "crop" trims the edges
+pad_color = "#ffffff"
+max_width = 1440
+jpeg_quality = 90
+
+[ai]
+enabled = false             # true: Claude drafts a caption for images that have no caption file
+model = "claude-opus-5-5"
+language = "English"
+voice = ""                  # describe your style, e.g. "Warm, short, first person, no emoji."
+
+[crosspost]
+facebook = false            # also publish to a Facebook Page
+threads = false             # also publish to Threads
+
+[notify]
+low_queue = 3               # alert when fewer than this many posts remain
+repeat_hours = 24           # don't repeat the same alert more often than this
+
+[insights]
+days = 30                   # how far back the weekly report looks

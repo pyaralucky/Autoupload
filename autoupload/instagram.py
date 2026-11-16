@@ -1,19 +1,24 @@
-"""Thin client for the Instagram content publishing API.
+"""Clients for the Instagram content publishing API (and the shared plumbing
+used by the Facebook and Threads cross-posters).
 
 Publishing is a two-step flow: create a media *container* that points at a
-publicly reachable image URL, wait until Instagram has ingested it, then
-publish the container. Carousels are a parent container over child containers.
+publicly reachable file URL, wait until it has been ingested, then publish
+the container. Carousels are a parent container over child containers.
 """
 
 from __future__ import annotations
 
 import time
-from typing import Callable, Sequence
+from dataclasses import dataclass, field
+from typing import Callable
 
 import requests
 
 DEFAULT_API_BASE = "https://graph.facebook.com"
 DEFAULT_API_VERSION = "v24.0"
+
+IMAGE_TIMEOUT = 120.0
+VIDEO_TIMEOUT = 900.0
 
 
 class InstagramError(Exception):
@@ -21,90 +26,42 @@ class InstagramError(Exception):
 
 
 class MediaRejected(InstagramError):
-    """Instagram accepted the request but could not process this media."""
+    """The request was accepted but this media could not be processed."""
 
 
-class InstagramClient:
+@dataclass
+class Post:
+    """What to publish, independent of the destination network."""
+
+    kind: str  # image | carousel | reel | story
+    media: list[tuple[str, bool]]  # (public url, is_video)
+    caption: str = ""
+    alt: list[str] = field(default_factory=list)
+    location: str = ""
+
+
+class GraphAPI:
+    """Minimal Graph-style HTTP client with uniform error reporting."""
+
     def __init__(
         self,
-        user_id: str,
+        root: str,
         access_token: str,
         *,
-        api_base: str = DEFAULT_API_BASE,
-        api_version: str = DEFAULT_API_VERSION,
         session: requests.Session | None = None,
         sleep: Callable[[float], None] = time.sleep,
         poll_interval: float = 5.0,
-        poll_timeout: float = 120.0,
     ) -> None:
-        self.user_id = user_id
-        self._root = f"{api_base.rstrip('/')}/{api_version}"
+        self._root = root.rstrip("/")
         self._session = session or requests.Session()
         # Header rather than query string so the token never lands in URLs/logs.
         self._headers = {"Authorization": f"Bearer {access_token}"}
         self._sleep = sleep
         self._poll_interval = poll_interval
-        self._poll_timeout = poll_timeout
 
-    # -- public API ---------------------------------------------------------
-
-    def publish_image(self, image_url: str, caption: str = "") -> str:
-        """Publish a single image. Returns the new media id."""
-        container = self._create_container(image_url=image_url, caption=caption)
-        self._wait_until_ready(container)
-        return self._publish(container)
-
-    def publish_carousel(self, image_urls: Sequence[str], caption: str = "") -> str:
-        """Publish 2-10 images as one carousel post. Returns the new media id."""
-        children = []
-        for url in image_urls:
-            child = self._create_container(image_url=url, is_carousel_item="true")
-            self._wait_until_ready(child)
-            children.append(child)
-        parent = self._create_container(
-            media_type="CAROUSEL", children=",".join(children), caption=caption
-        )
-        self._wait_until_ready(parent)
-        return self._publish(parent)
-
-    def permalink(self, media_id: str) -> str | None:
-        return self._call("GET", media_id, fields="permalink").get("permalink")
-
-    def account(self) -> dict:
-        """Basic account info; doubles as a credentials check."""
-        return self._call("GET", self.user_id, fields="id,username")
-
-    # -- internals ----------------------------------------------------------
-
-    def _create_container(self, **params: str) -> str:
-        params = {k: v for k, v in params.items() if v != ""}
-        return self._call("POST", f"{self.user_id}/media", **params)["id"]
-
-    def _publish(self, container_id: str) -> str:
-        return self._call(
-            "POST", f"{self.user_id}/media_publish", creation_id=container_id
-        )["id"]
-
-    def _wait_until_ready(self, container_id: str) -> None:
-        waited = 0.0
-        while True:
-            info = self._call("GET", container_id, fields="status_code,status")
-            status = info.get("status_code")
-            if status in ("FINISHED", "PUBLISHED"):
-                return
-            if status in ("ERROR", "EXPIRED"):
-                raise MediaRejected(
-                    f"container {container_id} is {status}: {info.get('status', 'no detail')}"
-                )
-            if waited >= self._poll_timeout:
-                raise InstagramError(
-                    f"container {container_id} still {status} after {waited:.0f}s"
-                )
-            self._sleep(self._poll_interval)
-            waited += self._poll_interval
-
-    def _call(self, method: str, path: str, **params: str) -> dict:
+    def call(self, method: str, path: str, **params: str) -> dict:
         url = f"{self._root}/{path}"
+        params = {k: v for k, v in params.items() if v not in ("", None)}
         kwargs = {"params": params} if method == "GET" else {"data": params}
         try:
             resp = self._session.request(
@@ -116,8 +73,12 @@ class InstagramClient:
             body = resp.json()
         except ValueError:
             body = {}
+        if not isinstance(body, dict):
+            body = {"data": body}
         if resp.status_code >= 400 or "error" in body:
             err = body.get("error") or {}
+            if not isinstance(err, dict):
+                err = {"message": str(err)}
             detail = err.get("error_user_msg") or err.get("message") or resp.text[:300]
             code = err.get("code", "?")
             sub = err.get("error_subcode")
@@ -126,3 +87,120 @@ class InstagramClient:
                 f"{method} {path} failed (HTTP {resp.status_code}, {tag}): {detail}"
             )
         return body
+
+    def wait_until_ready(
+        self, container_id: str, *, fields: str, status_key: str, timeout: float
+    ) -> None:
+        waited = 0.0
+        while True:
+            info = self.call("GET", container_id, fields=fields)
+            status = info.get(status_key)
+            if status in ("FINISHED", "PUBLISHED"):
+                return
+            if status in ("ERROR", "EXPIRED"):
+                detail = info.get("status") if status_key != "status" else None
+                detail = detail or info.get("error_message") or "no detail"
+                raise MediaRejected(f"container {container_id} is {status}: {detail}")
+            if waited >= timeout:
+                raise InstagramError(
+                    f"container {container_id} still {status} after {waited:.0f}s"
+                )
+            self._sleep(self._poll_interval)
+            waited += self._poll_interval
+
+
+class InstagramClient(GraphAPI):
+    def __init__(
+        self,
+        user_id: str,
+        access_token: str,
+        *,
+        api_base: str = DEFAULT_API_BASE,
+        api_version: str = DEFAULT_API_VERSION,
+        **kwargs,
+    ) -> None:
+        super().__init__(f"{api_base.rstrip('/')}/{api_version}", access_token, **kwargs)
+        self.user_id = user_id
+
+    # -- publishing ---------------------------------------------------------
+
+    def publish(self, post: Post) -> str:
+        """Publish a post of any kind. Returns the new media id."""
+        if post.kind == "carousel":
+            children = []
+            for index, (url, video) in enumerate(post.media):
+                alt = post.alt[index] if index < len(post.alt) else ""
+                if video:
+                    params = {"media_type": "VIDEO", "video_url": url}
+                else:
+                    params = {"image_url": url, "alt_text": alt}
+                children.append(self._container(video, is_carousel_item="true", **params))
+            container = self._container(
+                False,
+                media_type="CAROUSEL",
+                children=",".join(children),
+                caption=post.caption,
+                location_id=post.location,
+            )
+        else:
+            url, video = post.media[0]
+            if post.kind == "story":
+                params = {"media_type": "STORIES"}
+                params["video_url" if video else "image_url"] = url
+            elif post.kind == "reel":
+                params = {
+                    "media_type": "REELS",
+                    "video_url": url,
+                    "share_to_feed": "true",
+                    "caption": post.caption,
+                    "location_id": post.location,
+                }
+            else:
+                params = {
+                    "image_url": url,
+                    "caption": post.caption,
+                    "alt_text": post.alt[0] if post.alt else "",
+                    "location_id": post.location,
+                }
+            container = self._container(video, **params)
+        return self.call(
+            "POST", f"{self.user_id}/media_publish", creation_id=container
+        )["id"]
+
+    def publish_image(self, image_url: str, caption: str = "") -> str:
+        return self.publish(Post("image", [(image_url, False)], caption))
+
+    def comment(self, media_id: str, message: str) -> str:
+        return self.call("POST", f"{media_id}/comments", message=message)["id"]
+
+    # -- reading ------------------------------------------------------------
+
+    def permalink(self, media_id: str) -> str | None:
+        return self.call("GET", media_id, fields="permalink").get("permalink")
+
+    def account(self) -> dict:
+        """Basic account info; doubles as a credentials check."""
+        return self.call("GET", self.user_id, fields="id,username")
+
+    def media_counts(self, media_id: str) -> dict:
+        return self.call("GET", media_id, fields="like_count,comments_count")
+
+    def media_insights(self, media_id: str, metrics: list[str]) -> dict:
+        body = self.call("GET", f"{media_id}/insights", metric=",".join(metrics))
+        out = {}
+        for row in body.get("data", []):
+            values = row.get("values") or [{}]
+            out[row.get("name")] = values[0].get("value")
+        return out
+
+    # -- internals ----------------------------------------------------------
+
+    def _container(self, video: bool, **params: str) -> str:
+        container = self.call("POST", f"{self.user_id}/media", **params)["id"]
+        self.wait_until_ready(
+            container,
+            fields="status_code,status",
+            status_key="status_code",
+            timeout=VIDEO_TIMEOUT if video else IMAGE_TIMEOUT,
+        )
+        return container

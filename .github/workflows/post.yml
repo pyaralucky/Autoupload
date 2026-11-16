@@ -2,12 +2,12 @@ name: Post to Instagram
 
 on:
   schedule:
-    # Every day at 13:17 UTC. Change the cron line to change the cadence.
-    - cron: "17 13 * * *"
+    # Wakes up hourly; a post only goes out when a slot in autoupload.toml is due.
+    - cron: "7 * * * *"
   workflow_dispatch:
     inputs:
       count:
-        description: How many posts to publish
+        description: How many posts to publish right now
         default: "1"
       dry_run:
         description: Only show what would be posted
@@ -16,46 +16,61 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
-  group: instagram-post
+  group: autoupload-queue
   cancel-in-progress: false
 
 jobs:
   post:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      IG_USER_ID: ${{ secrets.IG_USER_ID }}
+      IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+      FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
+      THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+      THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
+      IG_API_BASE: ${{ vars.IG_API_BASE }}
+      IG_API_VERSION: ${{ vars.IG_API_VERSION }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
 
       - run: pip install -r requirements.txt
 
-      - name: Publish next item(s)
+      - name: Fix images and draft captions
+        if: ${{ !inputs.dry_run }}
+        run: |
+          python -m autoupload prepare
+          .github/scripts/commit.sh "Prepare Instagram queue"
+          # Media URLs must point at the commit that holds the prepared files.
+          echo "AUTOUPLOAD_REF=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Publish
         env:
-          IG_USER_ID: ${{ secrets.IG_USER_ID }}
-          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
-          PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
-          IG_API_BASE: ${{ vars.IG_API_BASE }}
-          IG_API_VERSION: ${{ vars.IG_API_VERSION }}
-          DEFAULT_CAPTION: ${{ vars.DEFAULT_CAPTION }}
+          EVENT: ${{ github.event_name }}
           COUNT: ${{ inputs.count || '1' }}
           DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
-        run: python -m autoupload post --count "$COUNT" $DRY_RUN
+        run: |
+          if [ "$EVENT" = "schedule" ]; then
+            python -m autoupload post --scheduled
+          else
+            python -m autoupload post --count "$COUNT" $DRY_RUN
+          fi
 
       - name: Record what was posted
-        # Runs even if a later item failed, so a published post is never re-sent.
-        if: always()
-        run: |
-          git add -A queue posted failed 2>/dev/null || true
-          if git diff --cached --quiet; then
-            echo "Nothing to record."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Update Instagram queue after posting"
-          git pull --rebase
-          git push
+        # Runs even after a failure, so a published post is never sent twice.
+        if: ${{ always() && !inputs.dry_run }}
+        run: .github/scripts/commit.sh "Update Instagram queue after posting"
