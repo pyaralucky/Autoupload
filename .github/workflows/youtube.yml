@@ -1,0 +1,67 @@
+name: Telegram to YouTube
+
+# Uploads the videos sent to the Telegram bot since the last run.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only show what would be uploaded
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+
+# Its own group: a long upload must not hold up the Instagram workflows.
+concurrency:
+  group: autoupload-youtube
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+      TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+      TELEGRAM_ALLOWED_CHATS: ${{ vars.TELEGRAM_ALLOWED_CHATS }}
+      YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+      YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+      YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+    steps:
+      - name: Not set up yet
+        if: ${{ env.TELEGRAM_BOT_TOKEN == '' || env.YT_REFRESH_TOKEN == '' }}
+        run: echo "TELEGRAM_BOT_TOKEN or YT_REFRESH_TOKEN is not set; nothing to do. See the README."
+
+      - uses: actions/checkout@v4
+        if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.YT_REFRESH_TOKEN != '' }}
+
+      - uses: actions/setup-python@v5
+        if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.YT_REFRESH_TOKEN != '' }}
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.YT_REFRESH_TOKEN != '' }}
+        run: |
+          pip install -r requirements.txt
+          # Only needed for videos over 20 MB.
+          if [ -n "$TELEGRAM_API_ID" ]; then pip install -r requirements-large.txt; fi
+
+      - name: Upload
+        if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.YT_REFRESH_TOKEN != '' }}
+        env:
+          DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: python -m autoupload youtube $DRY_RUN
+
+      - name: Record what was uploaded
+        # Runs even after a failure, so an uploaded video is never sent twice.
+        if: ${{ always() && !inputs.dry_run && env.TELEGRAM_BOT_TOKEN != '' && env.YT_REFRESH_TOKEN != '' }}
+        run: .github/scripts/commit.sh "Update YouTube upload log"

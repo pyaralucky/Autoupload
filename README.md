@@ -6,6 +6,9 @@ schedule: feed posts, carousels, Reels and Stories.
 It uses Instagram's official content publishing API (no password, no browser
 automation) and runs on GitHub Actions, so there is no server to maintain.
 
+It also uploads videos to YouTube straight from Telegram: send a video to
+your bot and it appears on your channel. See [Telegram to YouTube](#telegram-to-youtube).
+
 ## How it works
 
 1. You commit files to `queue/`.
@@ -200,6 +203,113 @@ day.
 post with its estimated time, final caption, first comment and any problems.
 GitHub renders it with the images.
 
+## Telegram to YouTube
+
+Send or forward a video to your Telegram bot, or post it in a group or channel
+the bot is in, and it is uploaded to your YouTube channel. The bot replies to
+the video with the YouTube link, or with the reason it could not be uploaded.
+
+1. Every 15 minutes the **Telegram to YouTube** workflow reads the bot's new
+   messages.
+2. Each video from an allowed chat is downloaded and uploaded with the title,
+   description and tags taken from its caption.
+3. The result is logged in `posted/youtube.jsonl`.
+
+A video that fails for a passing reason (network, YouTube quota) stays queued
+and is retried; one YouTube will never accept is dropped and you are told why.
+The same video is never uploaded twice.
+
+### Captions
+
+```
+My trip to Goa
+Day one on the beach. #travel #goa
+
+@privacy: public
+@schedule: 2026-12-25 18:00
+@tags: vlog, beach life
+@playlist: PLxxxxxxxxxxxxxxxx
+```
+
+- The **first line** is the title, the rest is the description. Hashtags also
+  become tags.
+- Without a caption the title is the file name, or `default_title` from
+  `autoupload.toml`.
+- `@` lines are optional and are not published:
+
+| Line | Effect |
+| --- | --- |
+| `@privacy:` | `public`, `unlisted` or `private`, overriding the default |
+| `@schedule:` | Upload now as private and go public at this time (timezone from `[schedule]`) |
+| `@tags:` | Extra tags, comma separated |
+| `@playlist:` | Playlist id to add the video to |
+| `@category:` | YouTube category id |
+
+Defaults for all of these are in the `[youtube]` section of `autoupload.toml`.
+**Uploads are private by default**; set `privacy = "public"` there once you
+are happy with how it works. Vertical videos of up to three minutes become
+Shorts automatically.
+
+### Setup
+
+**1. Telegram bot.** Message [@BotFather](https://t.me/BotFather), send
+`/newbot` and save the token as the `TELEGRAM_BOT_TOKEN` secret. Use a bot
+that no other program reads messages from. To use it in a group, also send
+BotFather `/setprivacy` and choose *Disable* so the bot can see videos; in a
+channel, add the bot as an administrator.
+
+**2. Google credentials.**
+
+1. In the [Google Cloud console](https://console.cloud.google.com/) create a
+   project and enable **YouTube Data API v3**.
+2. Configure the OAuth consent screen (audience *External*), then set its
+   publishing status to **In production**. While it is left in *Testing*, the
+   sign-in below stops working after 7 days.
+3. Under **Credentials** create an **OAuth client ID** of type **Desktop app**.
+4. On your own computer, put the client id and secret in `.env` as
+   `YT_CLIENT_ID` and `YT_CLIENT_SECRET`, then run:
+
+   ```
+   pip install -r requirements.txt
+   python -m autoupload youtube-auth
+   ```
+
+   Sign in with the Google account that owns the channel. Google shows an
+   "unverified app" warning for your own app; continue past it. The command
+   prints a refresh token.
+5. Save `YT_CLIENT_ID`, `YT_CLIENT_SECRET` and `YT_REFRESH_TOKEN` as
+   repository secrets.
+
+**3. Allow your chat.** Only chats you list can upload; until you list one,
+nothing is uploaded. Send `/id` to the bot, run the workflow once from the
+**Actions** tab, and the bot replies with the chat's id. Save it as the
+repository **variable** `TELEGRAM_ALLOWED_CHATS` (several ids separated by
+commas). Everyone who can post in an allowed chat can upload to your channel.
+
+**4. Videos over 20 MB (optional).** Telegram only lets bots download 20 MB
+the usual way. To raise that to 2 GB, create an application at
+<https://my.telegram.org> (*API development tools*) and save its
+`api_id` and `api_hash` as the secrets `TELEGRAM_API_ID` and `TELEGRAM_API_HASH`.
+
+Check everything with `python -m autoupload youtube-check`.
+
+### Things to know
+
+- **Google's limits.** A new Google Cloud project has a daily API quota that
+  covers only a few uploads a day; when it runs out, videos wait and go up
+  after it resets. Google also locks uploads from API projects that have not
+  passed its [compliance audit](https://support.google.com/youtube/contact/yt_api_form)
+  to *private*: you can switch them to public by hand in YouTube Studio, and
+  the audit removes the restriction.
+- **Speed.** GitHub runs the schedule roughly every 15 minutes, sometimes
+  later. For uploads within seconds, run `python -m autoupload youtube --watch`
+  on any always-on computer instead and disable the workflow; do not run both.
+- **Waiting time.** Telegram keeps unread bot messages for 24 hours, so the
+  workflow must not be off for longer than that.
+- **Public repositories.** The titles of uploaded videos and the ids of the
+  chats they came from are stored in `posted/`, which is visible to anyone who
+  can see the repository.
+
 ## Running locally
 
 ```
@@ -213,6 +323,11 @@ python -m autoupload post --dry-run   # preview
 python -m autoupload post --count 2   # publish the next two items now
 python -m autoupload insights         # write reports/insights.md
 python -m autoupload refresh-token --check-only
+
+python -m autoupload youtube-check    # verify the YouTube and Telegram credentials
+python -m autoupload youtube --dry-run   # show the videos waiting in Telegram
+python -m autoupload youtube          # upload them now
+python -m autoupload youtube --watch  # keep running and upload as videos arrive
 ```
 
 Tests: `python -m unittest discover -s tests`
@@ -235,3 +350,6 @@ On a public repository GitHub Actions is free. On a private one the hourly
 check uses roughly 700 to 1,500 of the 2,000 free minutes a month; to use
 fewer, narrow the `cron` line in `.github/workflows/post.yml` to the hours
 around your slots.
+The Telegram to YouTube check every 15 minutes adds about 2,900 minutes a
+month, more than the free allowance of a private repository: lengthen the
+`cron` interval in `.github/workflows/youtube.yml`, or use `--watch` instead.

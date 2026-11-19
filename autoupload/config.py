@@ -35,6 +35,19 @@ DEFAULTS: dict = {
     "crosspost": {"facebook": False, "threads": False},
     "notify": {"low_queue": 3, "repeat_hours": 24},
     "insights": {"days": 30},
+    "youtube": {
+        "privacy": "private",  # private | unlisted | public
+        "category": "22",  # People & Blogs
+        "default_title": "Video {date}",  # for videos sent without a caption
+        "description_footer": "",
+        "tags": [],
+        "playlist": "",
+        "made_for_kids": False,
+        "notify_subscribers": True,
+        "reply": True,  # answer in Telegram with the link or the reason it failed
+        "max_per_run": 5,
+        "max_attempts": 5,
+    },
 }
 
 
@@ -66,4 +79,8 @@ def load_config(root: Path) -> dict:
         _merge(config, data)
     if config["images"]["fit"] not in ("pad", "crop"):
         raise ConfigError("autoupload.toml: images.fit must be 'pad' or 'crop'")
+    if config["youtube"]["privacy"] not in ("private", "unlisted", "public"):
+        raise ConfigError(
+            "autoupload.toml: youtube.privacy must be 'private', 'unlisted' or 'public'"
+        )
     return config

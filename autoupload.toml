@@ -40,3 +40,17 @@ repeat_hours = 24           # don't repeat the same alert more often than this
 
 [insights]
 days = 30                   # how far back the weekly report looks
+
+# Telegram -> YouTube: videos sent to the bot are uploaded to your channel.
+[youtube]
+privacy = "private"         # "private", "unlisted" or "public"; a caption line "@privacy: public" overrides it
+category = "22"             # YouTube category id; 22 = People & Blogs, 10 = Music, 27 = Education
+default_title = "Video {date}"   # title for a video sent without a caption; {date} and {time} are filled in
+description_footer = ""     # appended to every description
+tags = []                   # added to every video, e.g. ["vlog", "travel"]
+playlist = ""               # playlist id (PL...) every upload is added to
+made_for_kids = false
+notify_subscribers = true
+reply = true                # the bot answers in Telegram with the link, or the reason it failed
+max_per_run = 5             # uploads per run; the rest wait for the next run
+max_attempts = 5            # give up on a video after this many failed tries

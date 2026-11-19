@@ -24,6 +24,8 @@ from .instagram import (
     Post,
 )
 from .notify import notify
+from .telegram import TelegramBot, TelegramError
+from .youtube import YouTubeClient, YouTubeError
 from .queue import (
     Item,
     archive,
@@ -337,9 +339,74 @@ def cmd_post(args, env, session) -> int:
     return 0
 
 
+def make_youtube(env: dict, session) -> YouTubeClient:
+    names = ("YT_CLIENT_ID", "YT_CLIENT_SECRET", "YT_REFRESH_TOKEN")
+    missing = [k for k in names if not env.get(k)]
+    if missing:
+        raise ConfigError(f"Missing required setting(s): {', '.join(missing)}")
+    return YouTubeClient(*(env[k] for k in names), session=session)
+
+
+def make_bot(env: dict, session) -> TelegramBot:
+    if not env.get("TELEGRAM_BOT_TOKEN"):
+        raise ConfigError("Missing required setting: TELEGRAM_BOT_TOKEN")
+    return TelegramBot(
+        env["TELEGRAM_BOT_TOKEN"], session=session, api_base=env.get("TELEGRAM_API_BASE") or ""
+    )
+
+
+def cmd_youtube(args, env, session) -> int:
+    from . import tg2yt
+
+    config = settings(args.root, env)
+    bot = make_bot(env, session)
+    yt = None if args.dry_run else make_youtube(env, session)
+    if not args.watch:
+        tg2yt.run(args.root, config, env, session, bot, yt, dry_run=args.dry_run)
+        return 0
+    print("Watching Telegram for videos. Press Ctrl+C to stop.")
+    while True:
+        try:
+            tg2yt.run(args.root, config, env, session, bot, yt, wait=50, dry_run=args.dry_run)
+        except KeyboardInterrupt:
+            return 0
+        except (TelegramError, YouTubeError) as exc:
+            if isinstance(exc, tg2yt.AuthError):
+                raise
+            print(f"ERROR: {exc}; trying again in a minute.", file=sys.stderr)
+            _sleep(60)
+
+
+def cmd_youtube_check(args, env, session) -> int:
+    from . import telegram, tg2yt
+
+    settings(args.root, env)
+    channel = make_youtube(env, session).channel()
+    print(f"YouTube credentials OK: uploads go to '{channel['title']}' (id {channel['id']})")
+    me = make_bot(env, session).me()
+    print(f"Telegram bot OK: @{me.get('username', '?')}")
+    chats = sorted(tg2yt.allowed_chats(env))
+    if chats:
+        print("Allowed chats: " + ", ".join(map(str, chats)))
+    else:
+        print("No chat is allowed yet: send /id to the bot and set TELEGRAM_ALLOWED_CHATS.")
+    big = "up to 2 GB" if telegram.can_download_large(env) else "up to 20 MB (no TELEGRAM_API_ID)"
+    print(f"Video size: {big}")
+    return 0
+
+
+def cmd_youtube_auth(args, env, session) -> int:
+    from . import youtube_auth
+
+    token = youtube_auth.sign_in(env, session, args.port, not args.no_browser)
+    print("Signed in. Store this as the YT_REFRESH_TOKEN secret and keep it private:\n")
+    print(token)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="autoupload", description="Post queued images to Instagram."
+        prog="autoupload", description="Post queued media to Instagram and Telegram videos to YouTube."
     )
     parser.add_argument(
         "--root",
@@ -375,22 +442,36 @@ def main(argv: list[str] | None = None) -> int:
     )
     refresh.set_defaults(func=cmd_refresh_token)
 
+    yt = sub.add_parser("youtube", help="upload videos sent to the Telegram bot to YouTube")
+    yt.add_argument("--watch", action="store_true", help="keep running and upload as videos arrive")
+    yt.add_argument("--dry-run", action="store_true", help="show what would be uploaded; change nothing")
+    yt.set_defaults(func=cmd_youtube)
+    sub.add_parser(
+        "youtube-check", help="verify the YouTube and Telegram credentials"
+    ).set_defaults(func=cmd_youtube_check)
+    auth = sub.add_parser("youtube-auth", help="sign in to Google once to get YT_REFRESH_TOKEN")
+    auth.add_argument("--port", type=int, default=0, help="local port for the sign-in redirect")
+    auth.add_argument("--no-browser", action="store_true", help="print the address instead of opening it")
+    auth.set_defaults(func=cmd_youtube_auth)
+
     args = parser.parse_args(argv)
     load_dotenv(args.root / ".env")
     env = dict(os.environ)
     session = requests.Session()
     try:
         return args.func(args, env, session)
-    except (ConfigError, InstagramError) as exc:
+    except (ConfigError, InstagramError, YouTubeError, TelegramError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
-        if env.get("GITHUB_ACTIONS") and args.command in ("post", "refresh-token", "insights"):
+        if env.get("GITHUB_ACTIONS") and args.command in (
+            "post", "refresh-token", "insights", "youtube"
+        ):
             try:
                 config = load_config(args.root)
             except ConfigError:
                 from .config import DEFAULTS as config
             notify(
                 env, config, session, f"Autoupload: `{args.command}` failed",
-                f"```\n{exc}\n```\nNothing was lost; queued items stay in `queue/` "
+                f"```\n{exc}\n```\nNothing was lost; queued items stay queued "
                 "and are retried on the next run.",
             )
         return 2
