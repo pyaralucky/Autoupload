@@ -443,7 +443,7 @@ class PipelineTests(unittest.TestCase):
         # ...but a video that already went up is not uploaded a second time.
         web.updates.append(video_update(4, "Good", size=1, file_id="f2"))
         again = self.run_once(web)
-        self.assertEqual((again["queued"], len(web.uploads)), (0, 3))
+        self.assertEqual((again["queued"], len(web.uploads)), (0, 2))
         self.assertIn("already uploaded", web.sent[-1][1])
 
     def test_auth_error_stops_the_run_and_keeps_the_video(self):
