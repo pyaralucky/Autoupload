@@ -1,4 +1,5 @@
-"""Optional cross-posting of a published item to a Facebook Page and Threads.
+"""Optional cross-posting of a published item to a Facebook Page, Threads and
+YouTube (videos only, as Shorts).
 
 Cross-posting is best effort: the Instagram post is already live, so a
 failure here is reported but never fails the run.
@@ -8,6 +9,7 @@ from __future__ import annotations
 
 import json
 
+from . import youtube
 from .instagram import DEFAULT_API_VERSION, IMAGE_TIMEOUT, VIDEO_TIMEOUT, GraphAPI, Post
 
 THREADS_TEXT_LIMIT = 500
@@ -100,5 +102,9 @@ def targets(config: dict, env: dict, session) -> dict:
     if wanted["threads"] and env.get("THREADS_USER_ID") and env.get("THREADS_ACCESS_TOKEN"):
         out["threads"] = Threads(
             env["THREADS_USER_ID"], env["THREADS_ACCESS_TOKEN"], session=session
+        )
+    if wanted["youtube"] and all(env.get(k) for k in youtube.CREDENTIALS):
+        out["youtube"] = youtube.YouTube(
+            *(env[k] for k in youtube.CREDENTIALS), config["youtube"], session=session
         )
     return out

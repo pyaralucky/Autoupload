@@ -32,7 +32,15 @@ DEFAULTS: dict = {
         "voice": "",
         "language": "English",
     },
-    "crosspost": {"facebook": False, "threads": False},
+    "crosspost": {"facebook": False, "threads": False, "youtube": False},
+    "youtube": {
+        "privacy": "public",  # public | unlisted | private
+        "category": 22,  # People & Blogs
+        "tags": [],
+        "made_for_kids": False,
+        "altered_content": False,  # realistic AI-generated or altered footage
+        "notify_subscribers": True,
+    },
     "notify": {"low_queue": 3, "repeat_hours": 24},
     "insights": {"days": 30},
 }
@@ -66,4 +74,10 @@ def load_config(root: Path) -> dict:
         _merge(config, data)
     if config["images"]["fit"] not in ("pad", "crop"):
         raise ConfigError("autoupload.toml: images.fit must be 'pad' or 'crop'")
+    if config["youtube"]["privacy"] not in ("public", "unlisted", "private"):
+        raise ConfigError(
+            "autoupload.toml: youtube.privacy must be 'public', 'unlisted' or 'private'"
+        )
+    if not isinstance(config["youtube"]["tags"], list):
+        raise ConfigError("autoupload.toml: youtube.tags must be a list")
     return config

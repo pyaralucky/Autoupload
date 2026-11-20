@@ -33,6 +33,15 @@ voice = ""                  # describe your style, e.g. "Warm, short, first pers
 [crosspost]
 facebook = false            # also publish to a Facebook Page
 threads = false             # also publish to Threads
+youtube = false             # also upload videos to YouTube; short vertical ones become Shorts
+
+[youtube]
+privacy = "public"          # "public", "unlisted" or "private"
+category = 22               # 22 People & Blogs, 24 Entertainment, 26 Howto & Style, 27 Education, 28 Science & Technology
+tags = []                   # added to every video, e.g. ["travel", "shorts"]
+made_for_kids = false
+altered_content = false     # true: label videos as containing realistic AI-generated or altered footage
+notify_subscribers = true
 
 [notify]
 low_queue = 3               # alert when fewer than this many posts remain

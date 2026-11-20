@@ -13,7 +13,7 @@ from urllib.parse import quote
 
 import requests
 
-from . import crosspost, schedule
+from . import crosspost, schedule, youtube
 from .config import ConfigError, load_config
 from .instagram import (
     DEFAULT_API_BASE,
@@ -130,6 +130,8 @@ def cmd_list(args, env, session) -> int:
             print(f"       ! {problem}")
         for fix in item.fixes:
             print(f"       ~ {fix}")
+        for note in item.notes:
+            print(f"       i {note}")
         bad += bool(item.problems)
     print(f"\n{len(items)} queued, {bad} with problems. '~' lines are fixed by `prepare`.")
     return 1 if bad else 0
@@ -143,6 +145,9 @@ def cmd_check(args, env, session) -> int:
     for name, wanted in config["crosspost"].items():
         if wanted:
             state = "credentials present" if name in active else "enabled but credentials missing"
+            if name == "youtube" and name in active:
+                channel = active[name].channel()
+                state = f"credentials OK, channel: {channel['title']}" if channel else "credentials OK"
             print(f"Cross-post to {name}: {state}")
     return 0
 
@@ -202,13 +207,42 @@ def cmd_refresh_token(args, env, session) -> int:
     return 0
 
 
+def cmd_youtube_auth(args, env, session) -> int:
+    missing = [k for k in ("YT_CLIENT_ID", "YT_CLIENT_SECRET") if not env.get(k)]
+    if missing:
+        raise ConfigError(
+            f"Missing {', '.join(missing)}: put the OAuth client's id and secret in .env "
+            "first (see 'YouTube Shorts' in the README)."
+        )
+
+    def announce(url: str) -> None:
+        print(
+            "Open this address in a browser on this computer, sign in with the Google\n"
+            "account that owns the channel, pick the channel, and allow access:\n\n"
+            f"{url}\n\nWaiting for you to finish..."
+        )
+
+    token = youtube.authorize(
+        env["YT_CLIENT_ID"], env["YT_CLIENT_SECRET"], session, port=args.port, announce=announce
+    )
+    print(
+        "\nSuccess. Save this as the repository secret YT_REFRESH_TOKEN (and in .env for\n"
+        "local runs). Treat it like a password; it can upload to your channel.\n\n"
+        f"{token}\n"
+    )
+    return 0
+
+
 def _publish_item(item, client, extra, config, env, session, root, base, index) -> dict:
     """Publish one item everywhere. Returns the log record."""
     caption, comment = compose_caption(item, config, index)
     media = [(media_url(base, root, p), is_video(p)) for p in item.media]
     for url, _ in media:
         check_reachable(url, session)
-    post = Post(item.kind, media, caption, item.alt, item.location)
+    post = Post(
+        item.kind, media, caption, item.alt, item.location,
+        files=list(item.media), title=item.title, tags=item.tags,
+    )
     media_id = client.publish(post)
 
     warnings = []
@@ -224,6 +258,8 @@ def _publish_item(item, client, extra, config, env, session, root, base, index) 
             warnings.append(f"first comment: {exc}")
     if item.crosspost and item.kind != "story":
         for name, target in extra.items():
+            if not target.accepts(post):
+                continue
             try:
                 record[name] = target.publish(post)
                 print(f"  also on {name}: {record[name]}")
@@ -282,6 +318,11 @@ def cmd_post(args, env, session) -> int:
             print(f"Would post: {describe(item)}")
             for fix in item.fixes:
                 print(f"  ~ {fix}")
+            if item.kind == "reel" and item.crosspost and config["crosspost"]["youtube"]:
+                title = youtube.make_title(item.title, item.caption, item.media[0].name)
+                print(f"  also to YouTube as: {title!r}")
+            for note in item.notes:
+                print(f"  i {note}")
             posted += 1
             continue
 
@@ -339,7 +380,7 @@ def cmd_post(args, env, session) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="autoupload", description="Post queued images to Instagram."
+        prog="autoupload", description="Post queued images and videos to Instagram, and videos to YouTube."
     )
     parser.add_argument(
         "--root",
@@ -374,6 +415,13 @@ def main(argv: list[str] | None = None) -> int:
         "--check-only", action="store_true", help="test the refresh without saving"
     )
     refresh.set_defaults(func=cmd_refresh_token)
+    auth = sub.add_parser(
+        "youtube-auth", help="sign in to YouTube once and print the refresh token"
+    )
+    auth.add_argument(
+        "--port", type=int, default=0, help="local port for the sign-in redirect (default: any)"
+    )
+    auth.set_defaults(func=cmd_youtube_auth)
 
     args = parser.parse_args(argv)
     load_dotenv(args.root / ".env")

@@ -1,7 +1,8 @@
 # Autoupload
 
 Drop images and videos into a folder and they get posted to Instagram on a
-schedule: feed posts, carousels, Reels and Stories.
+schedule: feed posts, carousels, Reels and Stories. Videos can go to YouTube
+at the same time, where short vertical ones become Shorts.
 
 It uses Instagram's official content publishing API (no password, no browser
 automation) and runs on GitHub Actions, so there is no server to maintain.
@@ -35,7 +36,7 @@ queue/
     a.jpg
     b.jpg
     caption.txt
-  003-clip.mp4             Reel
+  003-clip.mp4             Reel (and YouTube Short, if enabled)
   2026-12-25-xmas.jpg      held until 25 December
   stories/                 everything in here is posted as a Story
     teaser.jpg
@@ -76,6 +77,8 @@ Golden hour at the lake.
 @location: 106078429431815
 @comment: Shot on a 35mm lens
 @crosspost: off
+@title: Sunrise swim at the lake
+@tags: lake, wild swimming
 ```
 
 | Line | Effect |
@@ -84,6 +87,8 @@ Golden hour at the lake.
 | `@location:` | Tags a place. The value is the Facebook Page id of the location. |
 | `@comment:` | Posted as the first comment after publishing. |
 | `@crosspost: off` | Keep this item on Instagram only. |
+| `@title:` | The video's title on YouTube. Without it, the first line of the caption is used (hashtags removed), or the file name. |
+| `@tags:` | YouTube tags for this video, comma separated, added to the ones in `autoupload.toml`. |
 
 Limits checked before posting: 2,200 characters and 30 hashtags, counted
 after the footer and hashtag set are added.
@@ -114,6 +119,11 @@ voice = "Warm, short, first person, no emoji."
 [crosspost]
 facebook = true
 threads = true
+youtube = true
+
+[youtube]
+privacy = "public"               # or "unlisted" / "private"
+tags = ["travel", "shorts"]      # added to every video
 ```
 
 The first scheduled run after installing only starts the clock; the first
@@ -153,6 +163,7 @@ first two are required; add the others for the features you want.
 | `ANTHROPIC_API_KEY` | AI captions |
 | `FB_PAGE_ID`, `FB_PAGE_ACCESS_TOKEN` | Cross-posting to a Facebook Page (`pages_manage_posts`) |
 | `THREADS_USER_ID`, `THREADS_ACCESS_TOKEN` | Cross-posting to Threads (`threads_content_publish`) |
+| `YT_CLIENT_ID`, `YT_CLIENT_SECRET`, `YT_REFRESH_TOKEN` | Uploading videos to YouTube; see [YouTube Shorts](#youtube-shorts) |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Alerts by Telegram as well as GitHub issues |
 
 | Variable | Purpose |
@@ -167,6 +178,61 @@ Scheduled workflows only run from the default branch, so this code has to be
 on it. To test, open **Actions → Post to Instagram → Run workflow** and tick
 **dry_run**: it lists what would be posted without posting. Run it without
 dry_run to publish immediately, outside the schedule.
+
+## YouTube Shorts
+
+With `[crosspost] youtube = true`, every Reel is also uploaded to your YouTube
+channel right after it goes live on Instagram. YouTube decides by itself what
+is a Short: a vertical or square video up to 3 minutes long. Anything else is
+uploaded as a regular video, and `QUEUE.md` tells you so beforehand. Images,
+carousels and Stories are not sent to YouTube.
+
+The title comes from `@title:` (see [Caption files](#caption-files)); the
+description is the Instagram caption. Titles are cut to 100 characters.
+
+### Connecting your channel
+
+This never involves your Google password. You create your own small Google
+"app", approve it once for your channel, and store the resulting token as a
+secret. You can withdraw it at any time at
+<https://myaccount.google.com/permissions>.
+
+1. At <https://console.cloud.google.com> create a project, then under
+   **APIs & Services → Library** enable **YouTube Data API v3**.
+2. Under **APIs & Services → OAuth consent screen**, set the app up as
+   **External** and then set its publishing status to **In production**.
+   Left on *Testing*, the token stops working after 7 days.
+3. Under **Credentials → Create credentials → OAuth client ID**, choose
+   **Desktop app**. Copy the client ID and client secret.
+4. On your own computer, put them in `.env` as `YT_CLIENT_ID` and
+   `YT_CLIENT_SECRET`, then run:
+
+   ```
+   python -m autoupload youtube-auth
+   ```
+
+   Open the address it prints, sign in, choose the channel and allow access.
+   Google warns that it has not verified the app; that is expected for an app
+   you made yourself (**Advanced → Go to …**). The command prints a refresh
+   token.
+5. Add the secrets `YT_CLIENT_ID`, `YT_CLIENT_SECRET` and `YT_REFRESH_TOKEN`
+   to the repository, and set `youtube = true` under `[crosspost]`.
+6. `python -m autoupload check` shows which channel the token uploads to.
+
+### Two Google rules to know about
+
+- **New API projects upload as private.** Until a project has passed
+  YouTube's API audit, videos it uploads are locked to private, whatever
+  `privacy` says. Request the audit with the
+  [YouTube API Services form](https://support.google.com/youtube/contact/yt_api_form).
+  Test with `privacy = "private"` first to confirm uploads work.
+- **Daily quota.** A Google project has a daily allowance of API calls, which
+  covers only a handful of uploads a day. When it is used up the upload fails
+  with `quotaExceeded` and you get an alert.
+
+If the YouTube upload fails, the Instagram post stays up, you get an alert
+with the reason, and the video is in `posted/` for you to upload by hand; it
+is not retried automatically.
 
 ## Features in detail
 
@@ -183,7 +249,7 @@ overwritten. Each caption is one API call billed to your Anthropic account.
 Videos are not captioned.
 
 **Cross-posting.** After an item is live on Instagram it is also published to
-the Facebook Page and/or Threads. Threads text is cut to 500 characters. If a
+the Facebook Page and/or Threads, and videos to YouTube. Threads text is cut to 500 characters. If a
 cross-post fails, the Instagram post stays up and you get an alert.
 
 **Alerts.** Issues are labelled `autoupload`. The same alert is not repeated
@@ -213,6 +279,7 @@ python -m autoupload post --dry-run   # preview
 python -m autoupload post --count 2   # publish the next two items now
 python -m autoupload insights         # write reports/insights.md
 python -m autoupload refresh-token --check-only
+python -m autoupload youtube-auth     # connect a YouTube channel (once)
 ```
 
 Tests: `python -m unittest discover -s tests`
@@ -226,6 +293,8 @@ Nothing is lost: the item stays in `queue/` and is retried at the next run.
 - **Media URL returned HTTP 404**: the repository is private or the file is
   not pushed; see `PUBLIC_BASE_URL`.
 - **Rate limit**: Instagram caps API publishing per account per 24 hours.
+- **Google sign-in failed (invalid_grant)**: the YouTube refresh token expired
+  or was withdrawn; run `youtube-auth` again and update `YT_REFRESH_TOKEN`.
 - **Missing permission**: a feature such as first comments or insights needs
   an extra permission on the token; see the table above.
 

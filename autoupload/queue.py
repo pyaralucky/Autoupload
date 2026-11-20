@@ -20,6 +20,8 @@ Caption files may contain directive lines, which are removed from the caption::
     @location: 106078429431815            (Facebook Page id of a place)
     @comment: posted as the first comment
     @crosspost: off
+    @title: Title on YouTube              (videos; default: first caption line)
+    @tags: travel, lake                   (YouTube tags)
 
 Items go out in filename order, except that dated items go first once due.
 Afterwards an item moves to ``posted/`` or, if it can never be accepted, to
@@ -50,7 +52,7 @@ MAX_HASHTAGS = 30
 MAX_CAROUSEL = 10
 STORIES_DIR = "stories"
 
-_DIRECTIVE = re.compile(r"^@(alt|location|comment|crosspost):\s*(.*)$", re.IGNORECASE)
+_DIRECTIVE = re.compile(r"^@(alt|location|comment|crosspost|title|tags):\s*(.*)$", re.IGNORECASE)
 _DATE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})(?:[-_T](\d{2})(\d{2}))?(?=[-_ .]|$)")
 
 
@@ -65,10 +67,13 @@ class Item:
     location: str = ""
     comment: str = ""
     crosspost: bool = True
+    title: str = ""  # YouTube
+    tags: list[str] = field(default_factory=list)  # YouTube
     has_caption_file: bool = False
     not_before: datetime | None = None  # naive, in the schedule's timezone
     problems: list[str] = field(default_factory=list)  # can never be posted as is
     fixes: list[str] = field(default_factory=list)  # `prepare` will resolve these
+    notes: list[str] = field(default_factory=list)  # worth knowing; blocks nothing
 
     @property
     def caption_path(self) -> Path:
@@ -169,6 +174,10 @@ def _read_caption(item: Item, default: str) -> None:
             item.comment = f"{item.comment}\n{value}".strip()
         elif key == "crosspost":
             item.crosspost = value.lower() not in ("off", "no", "false", "0")
+        elif key == "title":
+            item.title = value
+        elif key == "tags":
+            item.tags += [t.strip() for t in value.split(",") if t.strip()]
     item.caption = "\n".join(body).strip()
 
 
@@ -277,6 +286,12 @@ def load_queue(queue_dir: Path, config: dict) -> list[Item]:
         for path in item.media[:MAX_CAROUSEL]:
             _check_media(item, path)
         _check_caption(item, config)
+        if item.kind == "reel" and item.crosspost and config["crosspost"]["youtube"]:
+            from .youtube import short_note
+
+            note = short_note(item.media[0]) if item.media else None
+            if note:
+                item.notes.append(note)
     return items
 
 

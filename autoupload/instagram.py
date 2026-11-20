@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable
 
 import requests
@@ -38,6 +39,10 @@ class Post:
     caption: str = ""
     alt: list[str] = field(default_factory=list)
     location: str = ""
+    # Only used by destinations that take the file itself (YouTube).
+    files: list[Path] = field(default_factory=list)
+    title: str = ""
+    tags: list[str] = field(default_factory=list)
 
 
 class GraphAPI:
@@ -58,6 +63,9 @@ class GraphAPI:
         self._headers = {"Authorization": f"Bearer {access_token}"}
         self._sleep = sleep
         self._poll_interval = poll_interval
+
+    def accepts(self, post: Post) -> bool:
+        return True
 
     def call(self, method: str, path: str, **params: str) -> dict:
         url = f"{self._root}/{path}"

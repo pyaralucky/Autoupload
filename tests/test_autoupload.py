@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 from PIL import Image
 
-from autoupload import cli, crosspost, insights, notify, prepare, preview, schedule, tokens
+from autoupload import cli, crosspost, insights, notify, prepare, preview, schedule, tokens, youtube
 from autoupload.config import ConfigError, load_config
 from autoupload.instagram import InstagramClient, InstagramError, MediaRejected, Post
 from autoupload.queue import compose_caption, in_posting_order, jpeg_size, load_queue
@@ -32,8 +32,36 @@ def write_image(path: Path, size=(1080, 1080), mode="RGB") -> Path:
     return path
 
 
+def write_mp4(path: Path, seconds=20, width=1080, height=1920, sideways=False) -> Path:
+    """Just the index boxes of an MP4: enough to read length and shape."""
+
+    def box(kind, payload):
+        return struct.pack(">I4s", 8 + len(payload), kind) + payload
+
+    upright = (0x10000, 0, 0, 0, 0x10000, 0, 0, 0, 0x40000000)
+    turned = (0, 0x10000, 0, -0x10000, 0, 0, 0, 0, 0x40000000)
+    mvhd = box(b"mvhd", struct.pack(">IIIII", 0, 0, 0, 1000, seconds * 1000) + b"\x00" * 80)
+    stored = (height, width) if sideways else (width, height)
+    tkhd = box(
+        b"tkhd",
+        struct.pack(">IIIIII", 0, 0, 0, 1, 0, seconds * 1000)
+        + b"\x00" * 16
+        + struct.pack(">9i", *(turned if sideways else upright))
+        + struct.pack(">II", stored[0] << 16, stored[1] << 16),
+    )
+    audio = box(b"trak", box(b"tkhd", b"\x00" * 84))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(
+        box(b"ftyp", b"isom\x00\x00\x02\x00")
+        + box(b"moov", mvhd + audio + box(b"trak", tkhd))
+        + box(b"mdat", b"video")
+    )
+    return path
+
+
 class FakeResponse:
-    def __init__(self, status_code=200, body=None):
+    def __init__(self, status_code=200, body=None, headers=None):
+        self.headers = headers or {}
         self.status_code = status_code
         self._body = body if body is not None else {}
         self.text = json.dumps(self._body)
@@ -61,6 +89,8 @@ class FakeWeb:
         self.public = public
         self.issues = []
         self.fail = set()  # path fragments that should return an API error
+        self.upload_drops = 0  # how many times the YouTube upload breaks midway
+        self.uploaded = b""
         self._next = 100
 
     def paths(self, method=None):
@@ -78,6 +108,8 @@ class FakeWeb:
         return FakeResponse(200 if self.public else 404)
 
     def request(self, method, url, headers=None, timeout=None, params=None, data=None, json=None):
+        if url.startswith("https://upload.example/"):
+            return self._youtube_upload(headers, data)
         payload = params or data or json or {}
         for host in ("graph.facebook.com/v24.0/", "graph.threads.net/v1.0/", "graph.instagram.com/"):
             if host in url:
@@ -91,6 +123,18 @@ class FakeWeb:
 
         if "api.github.com" in url:
             return self._github(method, url, payload)
+        if url == youtube.TOKEN_URL:
+            if data.get("refresh_token") == "revoked":
+                return FakeResponse(400, {"error": "invalid_grant", "error_description": "Bad"})
+            body = {"access_token": "ya29"}
+            if data["grant_type"] == "authorization_code":
+                body["refresh_token"] = f"rt-for-{data['code']}"
+            return FakeResponse(body=body)
+        if url == youtube.UPLOAD_URL:
+            self.calls[-1] = (method, "youtube/upload", {"params": params, "json": json, "headers": headers})
+            return FakeResponse(headers={"Location": "https://upload.example/session1"})
+        if url == youtube.API_URL + "/channels":
+            return FakeResponse(body={"items": [{"id": "UC1", "snippet": {"title": "My Channel"}}]})
         if "api.telegram.org" in url:
             return FakeResponse(body={"ok": True})
         if path.endswith("oauth/access_token") or path == "refresh_access_token":
@@ -138,6 +182,19 @@ class FakeWeb:
         if fields == "id,username":
             return FakeResponse(body={"id": "42", "username": "me"})
         return FakeResponse(400, {"error": {"message": "unknown call", "code": 1}})
+
+    def _youtube_upload(self, headers, data):
+        self.calls.append(("PUT", "youtube/session", dict(headers)))
+        if data is None:  # "how much did you get?"
+            got = len(self.uploaded)
+            return FakeResponse(308, headers={"Range": f"bytes=0-{got - 1}"} if got else {})
+        chunk = data.read()
+        if self.upload_drops:
+            self.upload_drops -= 1
+            self.uploaded += chunk[: len(chunk) // 2]
+            return FakeResponse(503)
+        self.uploaded += chunk
+        return FakeResponse(201, {"id": "vid1"})
 
     def _github(self, method, url, payload):
         if url.endswith("/actions/secrets/public-key"):
@@ -257,6 +314,116 @@ class CrosspostTests(unittest.TestCase):
         text = web.payload("t1/threads")["text"]
         self.assertEqual(len(text), 500)
         self.assertTrue(text.endswith("…"))
+
+
+class YouTubeTests(TempRoot):
+    SETTINGS = {"privacy": "unlisted", "category": 27, "tags": ["Lake", "two words"],
+                "made_for_kids": False, "altered_content": True, "notify_subscribers": False}
+
+    def target(self, web, token="rt"):
+        return youtube.YouTube("cid", "csecret", token, self.SETTINGS, session=web, sleep=lambda s: None)
+
+    def post(self, path, caption="Morning <swim> #lake\n\nMore text", **kw):
+        return Post("reel", [("https://h/v.mp4", True)], caption, files=[path], **kw)
+
+    def test_upload_sends_metadata_then_the_file(self):
+        path = write_mp4(self.queue / "003-clip.mp4")
+        web = FakeWeb()
+        link = self.target(web).publish(self.post(path, tags=["#lake", "swim"]))
+        self.assertEqual(link, "https://www.youtube.com/shorts/vid1")
+        self.assertEqual(web.uploaded, path.read_bytes())
+        start = web.payload("youtube/upload")
+        self.assertEqual(start["params"]["uploadType"], "resumable")
+        self.assertEqual(start["params"]["notifySubscribers"], "false")
+        self.assertEqual(start["headers"]["Authorization"], "Bearer ya29")
+        self.assertEqual(start["headers"]["X-Upload-Content-Length"], str(path.stat().st_size))
+        self.assertEqual(start["json"]["snippet"], {
+            "title": "Morning ‹swim›",
+            "description": "Morning ‹swim› #lake\n\nMore text",
+            "tags": ["lake", "swim", "two words"],
+            "categoryId": "27",
+        })
+        self.assertEqual(start["json"]["status"], {
+            "privacyStatus": "unlisted", "selfDeclaredMadeForKids": False,
+            "containsSyntheticMedia": True,
+        })
+        self.assertEqual(sum(u == youtube.TOKEN_URL for u in web.paths()), 1)
+
+    def test_broken_upload_resumes_where_it_stopped(self):
+        path = write_mp4(self.queue / "clip.mp4", width=1920, height=1080)
+        web = FakeWeb()
+        web.upload_drops = 2
+        link = self.target(web).publish(self.post(path))
+        self.assertEqual(link, "https://www.youtube.com/watch?v=vid1")  # landscape: not a Short
+        self.assertEqual(web.uploaded, path.read_bytes())
+        ranges = [h.get("Content-Range") for _, p, h in web.calls if p == "youtube/session"]
+        size = path.stat().st_size
+        half = size // 2
+        self.assertEqual(ranges[:3], [None, f"bytes */{size}", f"bytes {half}-{size - 1}/{size}"])
+
+    def test_upload_gives_up_and_reports_api_errors(self):
+        path = write_mp4(self.queue / "clip.mp4")
+        web = FakeWeb()
+        web.upload_drops = 99
+        with self.assertRaisesRegex(youtube.YouTubeError, "did not finish after 5 tries"):
+            self.target(web).publish(self.post(path))
+        with self.assertRaisesRegex(youtube.YouTubeError, "invalid_grant.*youtube-auth"):
+            self.target(FakeWeb(), token="revoked").publish(self.post(path))
+        resp = FakeResponse(403, {"error": {"message": "Over <b>quota</b>", "errors": [{"reason": "quotaExceeded"}]}})
+        self.assertRegex(str(youtube._api_error(resp, "upload")), r"quotaExceeded\): Over quota\. The Google")
+
+    def test_titles_and_tags(self):
+        self.assertEqual(youtube.make_title("Mine #Shorts", "cap", "a.mp4"), "Mine #Shorts")
+        self.assertEqual(youtube.make_title("", "#only #tags\nSecond line #x", "a.mp4"), "Second line")
+        self.assertEqual(youtube.make_title("", "", "2026-12-25-0900-003_lake-swim.mp4"), "003 lake swim")
+        self.assertEqual(youtube.make_title("", "", "003-lake_swim.mov"), "lake swim")
+        self.assertEqual(len(youtube.make_title("", "x" * 150, "a.mp4")), 100)
+        self.assertEqual(youtube.make_tags(["a", "A", " #b ", ""]), ["a", "b"])
+        self.assertLessEqual(len(",".join(youtube.make_tags(["t" * 30 + str(i) for i in range(40)]))), 500)
+
+    def test_probe_reads_length_and_shape(self):
+        self.assertEqual(youtube.probe_video(write_mp4(self.queue / "a.mp4")), (20.0, 1080, 1920))
+        turned = write_mp4(self.queue / "b.mov", sideways=True)
+        self.assertEqual(youtube.probe_video(turned), (20.0, 1080, 1920))
+        self.assertIsNone(youtube.short_note(turned))
+        (self.queue / "junk.mp4").write_bytes(b"not a video at all")
+        self.assertIsNone(youtube.probe_video(self.queue / "junk.mp4"))
+        long_wide = write_mp4(self.queue / "c.mp4", seconds=240, width=1920, height=1080)
+        note = youtube.short_note(long_wide)
+        self.assertIn("4.0 min", note)
+        self.assertIn("landscape, 1920x1080", note)
+
+    def test_sign_in_flow_returns_a_refresh_token(self):
+        import threading
+        import urllib.error
+        import urllib.request
+        from urllib.parse import parse_qs, urlparse
+
+        seen = {}
+
+        def browser(url):
+            query = parse_qs(urlparse(url).query)
+            seen.update({k: v[0] for k, v in query.items()})
+            back = query["redirect_uri"][0]
+
+            def visit():
+                try:
+                    urllib.request.urlopen(f"{back}/?state=wrong&code=evil")
+                except urllib.error.HTTPError:
+                    pass
+                urllib.request.urlopen(f"{back}/?state={query['state'][0]}&code=abc").read()
+
+            threading.Thread(target=visit, daemon=True).start()
+
+        web = FakeWeb()
+        token = youtube.authorize("cid", "csecret", web, announce=browser, timeout=20)
+        self.assertEqual(token, "rt-for-abc")
+        self.assertEqual((seen["access_type"], seen["prompt"]), ("offline", "consent"))
+        self.assertIn("youtube.upload", seen["scope"])
+        self.assertEqual(web.payload(youtube.TOKEN_URL)["redirect_uri"], seen["redirect_uri"])
+
+    def test_check_names_the_channel(self):
+        self.assertEqual(self.target(FakeWeb()).channel(), {"id": "UC1", "title": "My Channel"})
 
 
 class ConfigAndScheduleTests(TempRoot):
@@ -529,6 +696,48 @@ class PostCommandTests(TempRoot):
         self.assertIn("threads:", entry["warnings"][0])
         self.assertEqual([i["title"] for i in web.issues], ["Autoupload: posted with warnings"])
 
+    YT_ENV = {"YT_CLIENT_ID": "cid", "YT_CLIENT_SECRET": "cs", "YT_REFRESH_TOKEN": "rt"}
+
+    def test_reel_also_goes_to_youtube_but_images_do_not(self):
+        self.toml("[crosspost]\nyoutube=true\n[youtube]\ntags=['x']\n[notify]\nlow_queue=0\n")
+        clip = write_mp4(self.queue / "00-clip.mp4")
+        data = clip.read_bytes()
+        (self.queue / "00-clip.txt").write_text("Watch this\n@title: My Short\n@tags: one, two")
+        web = FakeWeb()
+        self.assertEqual(self.run_post(web, count=2, env={**self.ENV, **self.YT_ENV}), 0)
+        reel, image = self.log()
+        self.assertEqual(reel["youtube"], "https://www.youtube.com/shorts/vid1")
+        self.assertNotIn("youtube", image)
+        self.assertEqual(web.uploaded, data)
+        snippet = web.payload("youtube/upload")["json"]["snippet"]
+        self.assertEqual((snippet["title"], snippet["description"], snippet["tags"]),
+                         ("My Short", "Watch this", ["one", "two", "x"]))
+        self.assertEqual(web.payload("42/media")["caption"], "Watch this")
+        self.assertEqual(sum(p == "youtube/upload" for p in web.paths()), 1)
+
+    def test_youtube_failure_keeps_the_instagram_post(self):
+        self.toml("[crosspost]\nyoutube=true\n[notify]\nlow_queue=0\n")
+        write_mp4(self.queue / "00-clip.mp4")
+        env = {**self.ENV, **self.YT_ENV, "YT_REFRESH_TOKEN": "revoked", "GITHUB_TOKEN": "gh"}
+        web = FakeWeb()
+        self.assertEqual(self.run_post(web, env=env), 0)
+        entry = self.log()[0]
+        self.assertEqual(entry["media_id"], "m1")
+        self.assertIn("youtube: Google sign-in failed", entry["warnings"][0])
+        self.assertEqual([i["title"] for i in web.issues], ["Autoupload: posted with warnings"])
+
+    def test_youtube_is_skipped_without_credentials_or_when_item_opts_out(self):
+        self.toml("[crosspost]\nyoutube=true\n[notify]\nlow_queue=0\n")
+        write_mp4(self.queue / "00-clip.mp4")
+        web = FakeWeb()
+        self.run_post(web)  # no YT_* secrets
+        (self.queue / "01 first.jpg").unlink()
+        write_mp4(self.queue / "01-clip.mp4")
+        (self.queue / "01-clip.txt").write_text("x\n@crosspost: off")
+        self.run_post(web, env={**self.ENV, **self.YT_ENV})
+        self.assertEqual(len(self.log()), 2)
+        self.assertNotIn("youtube/upload", web.paths())
+
     def test_low_queue_alert_is_not_repeated(self):
         self.toml("[notify]\nlow_queue=3\n")
         env = {**self.ENV, "GITHUB_TOKEN": "gh", "TELEGRAM_BOT_TOKEN": "b", "TELEGRAM_CHAT_ID": "c"}
@@ -631,6 +840,22 @@ class NotifyTokenInsightsPreviewTests(TempRoot):
         self.assertIn("> Hello", text)
         self.assertIn("Alt text: square", text)
         self.assertIn("⛔", text)
+
+    def test_preview_and_list_show_youtube_details(self):
+        write_mp4(self.queue / "001-wide.mp4", width=1920, height=1080)
+        (self.queue / "001-wide.txt").write_text("A day out #fun")
+        self.toml("[crosspost]\nyoutube=true\n[youtube]\ntags=['vlog']\n")
+        text = preview.render(self.root, self.config, datetime(2026, 11, 16, 10, 0, tzinfo=UTC))
+        self.assertIn("- YouTube title: A day out", text)
+        self.assertIn("- YouTube tags: vlog", text)
+        self.assertIn("ℹ️ YouTube will treat this as a regular video", text)
+        item = load_queue(self.queue, self.config)[0]
+        self.assertEqual((item.problems, item.fixes, len(item.notes)), ([], [], 1))
+        self.toml("")
+        self.assertNotIn("YouTube", preview.render(self.root, self.config, datetime.now(UTC)))
+        with self.assertRaisesRegex(ConfigError, "youtube.privacy"):
+            self.toml("[youtube]\nprivacy='hidden'\n")
+            self.config
 
 
 if __name__ == "__main__":

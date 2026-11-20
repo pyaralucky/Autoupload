@@ -8,6 +8,7 @@ from urllib.parse import quote
 
 from .queue import Item, compose_caption, in_posting_order, is_video, load_queue, posted_count
 from .schedule import timezone_of, upcoming_slots
+from .youtube import make_tags, make_title
 
 COLUMNS = 3
 
@@ -86,6 +87,12 @@ def render(root: Path, config: dict, now: datetime) -> str:
         if comment:
             out += ["First comment:", "", "> " + comment.replace("\n", "\n> "), ""]
         extras = []
+        if item.kind == "reel" and item.crosspost and config["crosspost"]["youtube"]:
+            title = make_title(item.title, item.caption, item.media[0].name)
+            extras.append(f"YouTube title: {title}")
+            tags = make_tags([*item.tags, *config["youtube"]["tags"]])
+            if tags:
+                extras.append(f"YouTube tags: {', '.join(tags)}")
         if item.alt:
             extras.append(f"Alt text: {' / '.join(item.alt)}")
         if item.location:
@@ -97,7 +104,9 @@ def render(root: Path, config: dict, now: datetime) -> str:
             out.append(f"- ⛔ {note}")
         for note in item.fixes:
             out.append(f"- 🔧 {note}")
-        if item.problems or item.fixes:
+        for note in item.notes:
+            out.append(f"- ℹ️ {note}")
+        if item.problems or item.fixes or item.notes:
             out.append("")
     return "\n".join(out)
 
