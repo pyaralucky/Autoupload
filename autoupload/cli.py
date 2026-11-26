@@ -113,6 +113,62 @@ def describe(item: Item) -> str:
     return f"{item.name} [{kind}] {tail}"
 
 
+def _diagnose(env: dict, session) -> None:
+    """Work out which ID and API host this token actually belongs to."""
+    from .instagram import GraphAPI
+
+    token = env["IG_ACCESS_TOKEN"]
+    version = env.get("IG_API_VERSION") or DEFAULT_API_VERSION
+    print("\nLooking for the right settings for this token...")
+
+    try:
+        me = GraphAPI(f"https://graph.instagram.com/{version}", token, session=session).call(
+            "GET", "me", fields="user_id,username"
+        )
+        print(
+            "This is an Instagram Login token. Set:\n"
+            "  variable IG_API_BASE = https://graph.instagram.com\n"
+            f"  secret   IG_USER_ID  = {me.get('user_id') or me.get('id')}"
+            f"   (@{me.get('username', '?')})"
+        )
+        return
+    except InstagramError:
+        pass
+
+    facebook = GraphAPI(f"{DEFAULT_API_BASE}/{version}", token, session=session)
+    try:
+        pages = facebook.call(
+            "GET", "me/accounts", fields="name,instagram_business_account{id,username}"
+        ).get("data", [])
+    except InstagramError as exc:
+        print(f"The token was not accepted by Facebook or Instagram: {exc}")
+        return
+    linked = [p for p in pages if p.get("instagram_business_account")]
+    if linked:
+        print("This is a Facebook Login token. Leave IG_API_BASE unset and set:")
+        for page in linked:
+            account = page["instagram_business_account"]
+            print(
+                f"  secret IG_USER_ID = {account['id']}   (@{account.get('username', '?')}, "
+                f"linked to the Facebook Page '{page.get('name', '?')}')"
+            )
+    elif pages:
+        names = ", ".join(f"'{p.get('name', '?')}'" for p in pages)
+        print(
+            f"This is a Facebook Login token and it can see the Page(s) {names}, but none "
+            "has an Instagram professional account linked. Link the Instagram account to "
+            "the Page (Page settings > Linked accounts > Instagram), or generate the token "
+            "through Instagram Login instead."
+        )
+    else:
+        print(
+            "This is a Facebook Login token but it cannot see any Facebook Page. Regenerate "
+            "it with the permissions pages_show_list, pages_read_engagement, instagram_basic "
+            "and instagram_content_publish, selecting your Page when asked; or generate the "
+            "token through Instagram Login instead."
+        )
+
+
 # -- commands ---------------------------------------------------------------
 
 
@@ -137,7 +193,13 @@ def cmd_list(args, env, session) -> int:
 
 def cmd_check(args, env, session) -> int:
     config = settings(args.root, env)
-    info = make_client(env, session).account()
+    client = make_client(env, session)
+    try:
+        info = client.account()
+    except InstagramError as exc:
+        print(f"Instagram credentials do NOT work: {exc}")
+        _diagnose(env, session)
+        return 2
     print(f"Instagram credentials OK: @{info.get('username', '?')} (id {info.get('id')})")
     active = crosspost.targets(config, env, session)
     for name, wanted in config["crosspost"].items():
