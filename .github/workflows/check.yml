@@ -1,8 +1,11 @@
 name: Check credentials
 
-# Run by hand from the Actions tab to confirm the Instagram secrets work.
+# Confirms the Instagram secrets work. Run it by hand from the Actions tab;
+# it also runs whenever this file changes.
 on:
   workflow_dispatch:
+  push:
+    paths: [".github/workflows/check.yml"]
 
 jobs:
   check:
