@@ -200,6 +200,25 @@ day.
 post with its estimated time, final caption, first comment and any problems.
 GitHub renders it with the images.
 
+## Posts created by Claude
+
+A scheduled Claude task prepares posts for the clinic (skincare tips, myth
+vs fact, treatment explainers) and opens a pull request titled "Posts for
+review". Open it to see every image and caption. **Merging it queues the
+posts; nothing is published before that.** To drop a post, delete its two
+files on that branch first; to change a caption, edit its `.txt` file there.
+
+- [`content/brief.md`](content/brief.md) is where you steer it: voice,
+  treatments offered, topics to favour or avoid. Treatment posts are only
+  written for treatments listed there.
+- [`content/PLAYBOOK.md`](content/PLAYBOOK.md) holds the rules the task
+  follows, including the medical-content limits.
+- Images are branded cards drawn by `python -m autoupload card`; colours and
+  the clinic name are under `[brand]` in `autoupload.toml`. Some cards carry
+  an AI-generated picture, which spends Higgsfield credits.
+- Files it creates start with `auto-`, so your own numbered photos are
+  always posted ahead of them.
+
 ## Running locally
 
 ```

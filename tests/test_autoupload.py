@@ -438,6 +438,25 @@ class PrepareTests(TempRoot):
         self.assertEqual(captured["messages"][0]["content"][0]["type"], "image")
 
 
+class CardTests(TempRoot):
+    def test_three_layouts_are_valid_queue_images(self):
+        from autoupload import card
+
+        brand = self.config["brand"]
+        src = write_image(self.root / "src.jpg", (1600, 900))
+        card.render(self.queue / "a.jpg", brand, label="Skincare tip", title="A headline " * 4,
+                    body="Body text. " * 20)
+        card.render(self.queue / "b.jpg", brand, label="Myth vs fact", myth="A myth " * 6,
+                    fact="A fact " * 12)
+        card.render(self.queue / "c.jpg", brand, label="Treatment explained",
+                    title="Peels: what to expect", image=src)
+        items = load_queue(self.queue, self.config)
+        self.assertEqual(len(items), 3)
+        for item in items:
+            self.assertEqual(jpeg_size(item.media[0]), (1080, 1350))
+            self.assertFalse(item.problems or item.fixes)
+
+
 class PostCommandTests(TempRoot):
     ENV = {
         "IG_USER_ID": "42",

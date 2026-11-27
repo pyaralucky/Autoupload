@@ -33,6 +33,14 @@ DEFAULTS: dict = {
         "language": "English",
     },
     "crosspost": {"facebook": False, "threads": False},
+    "brand": {
+        "name": "",
+        "handle": "",
+        "background": "#f7f1ea",
+        "text": "#1f3a3a",
+        "muted": "#8a9a98",
+        "accent": "#b9785f",
+    },
     "notify": {"low_queue": 3, "repeat_hours": 24},
     "insights": {"days": 30},
 }

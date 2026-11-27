@@ -1,9 +1,9 @@
-# Autoupload settings. Every value shown is the default; change what you need.
+# Autoupload settings. Values are the defaults unless a comment says otherwise.
 # Secrets (tokens, keys) never go here: see the README.
 
 [schedule]
-timezone = "UTC"            # e.g. "Asia/Kolkata", "Europe/London", "America/New_York"
-slots = ["13:17"]           # posting times, every day; one post per slot
+timezone = "Asia/Kolkata"   # default is "UTC"
+slots = ["10:30", "19:00"]  # posting times, every day; one post per slot (default ["13:17"])
 jitter_minutes = 0          # wait a random 0..N minutes so posts don't land on the same minute
 
 # Different times on particular weekdays (mon tue wed thu fri sat sun).
@@ -33,6 +33,14 @@ voice = ""                  # describe your style, e.g. "Warm, short, first pers
 [crosspost]
 facebook = false            # also publish to a Facebook Page
 threads = false             # also publish to Threads
+
+[brand]                     # used on the graphic cards (`python -m autoupload card`)
+name = "Revival Skin Clinic"          # default ""
+handle = "@revivalskinclinic"         # default ""
+background = "#f7f1ea"
+text = "#1f3a3a"
+muted = "#8a9a98"
+accent = "#b9785f"
 
 [notify]
 low_queue = 3               # alert when fewer than this many posts remain

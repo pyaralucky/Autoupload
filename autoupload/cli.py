@@ -229,6 +229,22 @@ def cmd_prepare(args, env, session) -> int:
     return 0
 
 
+def cmd_card(args, env, session) -> int:
+    from . import card
+
+    config = settings(args.root, env)
+    if not (args.title or (args.myth and args.fact)):
+        raise ConfigError("card needs --title, or both --myth and --fact")
+    if args.image and not args.image.is_file():
+        raise ConfigError(f"card: image not found: {args.image}")
+    path = card.render(
+        args.out, config["brand"], label=args.label, title=args.title, body=args.body,
+        myth=args.myth, fact=args.fact, image=args.image,
+    )
+    print(f"Wrote {path}")
+    return 0
+
+
 def cmd_preview(args, env, session) -> int:
     from . import preview
 
@@ -426,6 +442,16 @@ def main(argv: list[str] | None = None) -> int:
     prep = sub.add_parser("prepare", help="fix images, draft captions, update QUEUE.md")
     prep.add_argument("--no-ai", action="store_true", help="do not draft captions")
     prep.set_defaults(func=cmd_prepare)
+
+    card = sub.add_parser("card", help="draw a branded graphic card")
+    card.add_argument("--out", type=Path, required=True, help="JPEG file to write")
+    card.add_argument("--label", required=True, help="small tag, e.g. 'Skincare tip'")
+    card.add_argument("--title", default="", help="headline")
+    card.add_argument("--body", default="", help="supporting text (text cards only)")
+    card.add_argument("--myth", default="", help="myth text (with --fact)")
+    card.add_argument("--fact", default="", help="fact text (with --myth)")
+    card.add_argument("--image", type=Path, help="picture for the top of the card")
+    card.set_defaults(func=cmd_card)
 
     sub.add_parser("list", help="show the queue and validate it").set_defaults(func=cmd_list)
     sub.add_parser("check", help="verify the credentials").set_defaults(func=cmd_check)
