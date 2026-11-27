@@ -113,6 +113,41 @@ def describe(item: Item) -> str:
     return f"{item.name} [{kind}] {tail}"
 
 
+def _token_details(env: dict, session) -> None:
+    """Print when a Facebook Login token expires and whether it may publish."""
+    from .instagram import GraphAPI
+
+    base = (env.get("IG_API_BASE") or DEFAULT_API_BASE).rstrip("/")
+    if "graph.instagram.com" in base:
+        return  # Instagram Login tokens have no inspection endpoint
+    token = env["IG_ACCESS_TOKEN"]
+    version = env.get("IG_API_VERSION") or DEFAULT_API_VERSION
+    try:
+        data = GraphAPI(f"{base}/{version}", token, session=session).call(
+            "GET", "debug_token", input_token=token
+        ).get("data", {})
+    except InstagramError as exc:
+        print(f"(could not read token details: {exc})")
+        return
+    expires = data.get("expires_at")
+    if expires:
+        left = datetime.fromtimestamp(expires, timezone.utc) - datetime.now(timezone.utc)
+        hours = left.total_seconds() / 3600
+        when = f"{hours / 24:.0f} days" if hours >= 48 else f"{hours:.1f} hours"
+        print(f"Token expires in {when}.")
+        if hours < 48:
+            print("  WARNING: this is a short-lived token. Extend it in Meta's Access Token Debugger.")
+    else:
+        print("Token does not expire.")
+    scopes = set(data.get("scopes") or [])
+    for scope, purpose in (
+        ("instagram_content_publish", "posting"),
+        ("instagram_manage_comments", "first comments"),
+        ("instagram_manage_insights", "insights report"),
+    ):
+        print(f"  {'yes' if scope in scopes else 'NO '}  {scope} ({purpose})")
+
+
 def _diagnose(env: dict, session) -> None:
     """Work out which ID and API host this token actually belongs to."""
     from .instagram import GraphAPI
@@ -201,6 +236,7 @@ def cmd_check(args, env, session) -> int:
         _diagnose(env, session)
         return 2
     print(f"Instagram credentials OK: @{info.get('username', '?')} (id {info.get('id')})")
+    _token_details(env, session)
     active = crosspost.targets(config, env, session)
     for name, wanted in config["crosspost"].items():
         if wanted:

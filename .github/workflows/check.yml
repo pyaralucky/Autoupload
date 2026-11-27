@@ -1,7 +1,7 @@
 name: Check credentials
 
 # Confirms the Instagram secrets work and suggests fixes. Run it by hand from the Actions tab;
-# it also runs whenever this file changes (last requested 2026-11-27).
+# it also runs whenever this file changes (last requested 2026-11-27, second time).
 on:
   workflow_dispatch:
   push:
