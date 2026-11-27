@@ -1,6 +1,6 @@
 # Upcoming posts
 
-13 queued. Times are estimates in Asia/Kolkata.
+14 queued. Times are estimates in Asia/Kolkata.
 
 ## Grid
 
@@ -11,12 +11,26 @@ Newest at the top left, as the profile grid will look once everything is posted.
 <tr><td><img src="queue/auto-20261127-11-scrubbing.jpg" width="220" alt="auto-20261127-11-scrubbing.jpg"></td><td><img src="queue/auto-20261127-10-dont-pick.jpg" width="220" alt="auto-20261127-10-dont-pick.jpg"></td><td><img src="queue/auto-20261127-09-neck-and-hands.jpg" width="220" alt="auto-20261127-09-neck-and-hands.jpg"></td></tr>
 <tr><td><img src="queue/auto-20261127-08-lemon-toothpaste.jpg" width="220" alt="auto-20261127-08-lemon-toothpaste.jpg"></td><td><img src="queue/auto-20261127-07-lukewarm-water.jpg" width="220" alt="auto-20261127-07-lukewarm-water.jpg"></td><td><img src="queue/auto-20261127-06-patch-test.jpg" width="220" alt="auto-20261127-06-patch-test.jpg"></td></tr>
 <tr><td><img src="queue/auto-20261127-05-darker-skin-sunscreen.jpg" width="220" alt="auto-20261127-05-darker-skin-sunscreen.jpg"></td><td><img src="queue/auto-20261127-04-moisturise-damp-skin.jpg" width="220" alt="auto-20261127-04-moisturise-damp-skin.jpg"></td><td><img src="queue/auto-20261127-03-wash-before-bed.jpg" width="220" alt="auto-20261127-03-wash-before-bed.jpg"></td></tr>
-<tr><td><img src="queue/auto-20261127-02-oily-skin-moisturiser.jpg" width="220" alt="auto-20261127-02-oily-skin-moisturiser.jpg"></td></tr>
+<tr><td><img src="queue/auto-20261127-02-oily-skin-moisturiser.jpg" width="220" alt="auto-20261127-02-oily-skin-moisturiser.jpg"></td><td><img src="queue/000-steroid-cream-misuse.jpg" width="220" alt="000-steroid-cream-misuse.jpg"></td></tr>
 </table>
 
 ## Schedule
 
-### Sat 28 Nov 2026, 10:30 — auto-20261127-02-oily-skin-moisturiser.jpg
+### Sat 28 Nov 2026, 10:30 — 000-steroid-cream-misuse.jpg
+
+_image_
+
+<img src="queue/000-steroid-cream-misuse.jpg" width="320" alt="000-steroid-cream-misuse.jpg">
+
+> Steroid creams are medicines, not fairness creams. Used without a doctor's advice they can thin the skin, worsen acne and cause lasting damage.
+> 
+> Use them only when prescribed, never share or reuse an old prescription, and do not stop suddenly on your own. See a dermatologist.
+> 
+> #steroidcream #skincareawareness #topicalsteroids #fairnesscream #skinhealth #dermatology #bhubaneswar
+
+- Alt text: Skin care awareness poster titled "Say No to Steroid Cream Misuse", listing five points: many fairness creams contain hidden steroids; they can thin skin and worsen acne; never use a cream without a prescription; do not share or reuse old prescriptions; do not stop suddenly, see a dermatologist. A hand holds a plain white cream tube.
+
+### Sat 28 Nov 2026, 19:00 — auto-20261127-02-oily-skin-moisturiser.jpg
 
 _image_
 
@@ -28,7 +42,7 @@ _image_
 
 - Alt text: Card reading: Myth: Oily skin does not need a moisturiser. Fact: Oily skin still needs hydration. Choose a light, non-comedogenic gel or lotion.
 
-### Sat 28 Nov 2026, 19:00 — auto-20261127-03-wash-before-bed.jpg
+### Sun 29 Nov 2026, 10:30 — auto-20261127-03-wash-before-bed.jpg
 
 _image_
 
@@ -40,7 +54,7 @@ _image_
 
 - Alt text: Skincare tip card reading: Never sleep with the day still on your face. Cleanse gently every night to remove sunscreen, make-up, sweat and pollution before bed.
 
-### Sun 29 Nov 2026, 10:30 — auto-20261127-04-moisturise-damp-skin.jpg
+### Sun 29 Nov 2026, 19:00 — auto-20261127-04-moisturise-damp-skin.jpg
 
 _image_
 
@@ -52,7 +66,7 @@ _image_
 
 - Alt text: Skincare tip card reading: Moisturise while your skin is still damp. Above the text is a still-life photograph of skincare items.
 
-### Sun 29 Nov 2026, 19:00 — auto-20261127-05-darker-skin-sunscreen.jpg
+### Mon 30 Nov 2026, 10:30 — auto-20261127-05-darker-skin-sunscreen.jpg
 
 _image_
 
@@ -64,7 +78,7 @@ _image_
 
 - Alt text: Card reading: Myth: Darker skin does not need sunscreen. Fact: Every skin tone needs sun protection. Sun exposure also worsens dark patches and uneven tone.
 
-### Mon 30 Nov 2026, 10:30 — auto-20261127-06-patch-test.jpg
+### Mon 30 Nov 2026, 19:00 — auto-20261127-06-patch-test.jpg
 
 _image_
 
@@ -76,7 +90,7 @@ _image_
 
 - Alt text: Skincare tip card reading: Patch test before you commit. Try a new product on a small area, such as behind the ear or the inner forearm, for a few days before using it on your whole face.
 
-### Mon 30 Nov 2026, 19:00 — auto-20261127-07-lukewarm-water.jpg
+### Tue 01 Dec 2026, 10:30 — auto-20261127-07-lukewarm-water.jpg
 
 _image_
 
@@ -88,7 +102,7 @@ _image_
 
 - Alt text: Skincare tip card reading: Wash with lukewarm water, not hot. Above the text is a still-life photograph of skincare items.
 
-### Tue 01 Dec 2026, 10:30 — auto-20261127-08-lemon-toothpaste.jpg
+### Tue 01 Dec 2026, 19:00 — auto-20261127-08-lemon-toothpaste.jpg
 
 _image_
 
@@ -100,7 +114,7 @@ _image_
 
 - Alt text: Card reading: Myth: Lemon juice or toothpaste will clear a pimple. Fact: Both can irritate and burn the skin, and may leave a dark mark behind.
 
-### Tue 01 Dec 2026, 19:00 — auto-20261127-09-neck-and-hands.jpg
+### Wed 02 Dec 2026, 10:30 — auto-20261127-09-neck-and-hands.jpg
 
 _image_
 
@@ -112,7 +126,7 @@ _image_
 
 - Alt text: Skincare tip card reading: Your neck and hands need sunscreen too. Above the text is a still-life photograph of skincare items.
 
-### Wed 02 Dec 2026, 10:30 — auto-20261127-10-dont-pick.jpg
+### Wed 02 Dec 2026, 19:00 — auto-20261127-10-dont-pick.jpg
 
 _image_
 
@@ -124,7 +138,7 @@ _image_
 
 - Alt text: Skincare tip card reading: Hands off that pimple. Squeezing pushes inflammation deeper and raises the chance of a scar or a dark mark.
 
-### Wed 02 Dec 2026, 19:00 — auto-20261127-11-scrubbing.jpg
+### Thu 03 Dec 2026, 10:30 — auto-20261127-11-scrubbing.jpg
 
 _image_
 
@@ -136,7 +150,7 @@ _image_
 
 - Alt text: Card reading: Myth: The harder you scrub, the cleaner your skin. Fact: Harsh scrubbing damages the skin barrier and can cause redness and more breakouts.
 
-### Thu 03 Dec 2026, 10:30 — auto-20261127-12-fresh-pillowcase.jpg
+### Thu 03 Dec 2026, 19:00 — auto-20261127-12-fresh-pillowcase.jpg
 
 _image_
 
@@ -148,7 +162,7 @@ _image_
 
 - Alt text: Skincare tip card reading: Change your pillowcase every week. Above the text is a still-life photograph of skincare items.
 
-### Thu 03 Dec 2026, 19:00 — auto-20261127-13-one-product-at-a-time.jpg
+### Fri 04 Dec 2026, 10:30 — auto-20261127-13-one-product-at-a-time.jpg
 
 _image_
 
@@ -160,7 +174,7 @@ _image_
 
 - Alt text: Skincare tip card reading: Add one new product at a time. Give each new product two to three weeks before adding another, so you know what is helping and what is not.
 
-### Fri 04 Dec 2026, 10:30 — auto-20261127-14-acne-dirty-skin.jpg
+### Fri 04 Dec 2026, 19:00 — auto-20261127-14-acne-dirty-skin.jpg
 
 _image_
 
