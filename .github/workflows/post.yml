@@ -6,6 +6,10 @@ on:
     # autoupload.toml is due. GitHub runs scheduled workflows late and skips
     # many of them, so frequent attempts keep posts close to their slot.
     - cron: "7,27,47 * * * *"
+  # Changing the file below publishes one post straight away. It exists so a
+  # post can be started by a commit when the Run workflow button is not to hand.
+  push:
+    paths: [".github/post-now"]
   workflow_dispatch:
     inputs:
       count:
