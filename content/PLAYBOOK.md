@@ -115,15 +115,22 @@ Caption file:
 
 Title: `Posts for review: N posts (YYYY-MM-DD)`.
 
-The description is what the owner reads on their phone, so make it complete:
+Images cannot be embedded in the pull request description (the repository
+may be private, where such links do not load). Instead, write the preview as
+a file on the branch, `content/REVIEW.md`, replacing any earlier one:
 
-- One line saying what the batch contains and how to approve it: "Merge to
-  queue these posts. To drop one, delete its two files on this branch first.
-  To change a caption, edit its .txt file on this branch."
-- Then every post in order: the image (embed it with its
-  `https://raw.githubusercontent.com/OWNER/REPO/BRANCH/queue/FILE` address),
-  followed by its caption as a quote.
-- Anything you could not do (no treatments listed, not enough credits, a
-  post dropped under the content rules).
+- a line saying which batch this is and how to approve it: "Merge the pull
+  request to queue these posts. To drop one, delete its two files in
+  `queue/` on this branch. To change a caption, edit its .txt file.";
+- then every post in order: a heading, the image as
+  `<img src="../queue/FILE.jpg" width="360">` (a relative path, which
+  GitHub displays in private repositories too), the caption as a quote, and
+  the two file names.
+
+Keep the description short: what the batch contains, a link to
+`https://github.com/OWNER/REPO/blob/BRANCH/content/REVIEW.md` as the place
+to see the images, the same approval instructions, and anything you could
+not do (no treatments listed, not enough credits, a post dropped under the
+content rules).
 
 Your final message repeats the pull request link and that summary.
