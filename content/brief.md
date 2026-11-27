@@ -16,9 +16,21 @@ Professional, warm and reassuring. Plain words, short sentences. No hype.
 
 ## Treatments offered
 
-<!-- List the treatments the clinic actually offers, one per line. Claude
-     only writes "treatment explained" posts for treatments listed here.
-     While this list is empty, no treatment posts are created. -->
+Claude only writes "treatment explained" posts for treatments listed here,
+one per line. Add or remove lines as the clinic's services change.
+
+- Chemical peels
+- Acne treatment
+- Acne-scar treatment
+- Pigmentation treatment (melasma, dark spots, uneven tone)
+- Laser hair reduction
+- Laser skin resurfacing and toning
+- PRP / GFC for hair
+- Hair fall and scalp treatment
+- Anti-wrinkle injections (botulinum toxin)
+- Dermal fillers
+- Mole, wart and skin-tag removal
+- Laser tattoo removal
 
 ## Topics to favour
 

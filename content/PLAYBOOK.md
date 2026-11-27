@@ -36,6 +36,18 @@ twice a day, so a full week is 14 posts.
 | Myth vs fact | `Myth vs fact` | A common misconception and the correction. |
 | Treatment explained | `Treatment explained` | Only for treatments listed in the brief. If that list is empty, make none and split the batch between the other two kinds. |
 
+When the brief lists treatments, about a third of each batch is treatment
+explainers, one treatment per post, starting with treatments that do not yet
+appear in the history file. In a small top-up batch, uncovered treatments
+come before tips and myths.
+
+A treatment explainer says, in general terms, what the treatment is, what
+concerns it is used for, and what a session and recovery typically involve.
+It always says that suitability depends on an assessment by the
+dermatologist. It does not name brands, give doses or settings, quote the
+number of sessions as a promise, or describe results as certain. Refer to
+injectables generically ("anti-wrinkle injections", "dermal fillers").
+
 ## Content rules
 
 These are firm; a post that cannot meet them is dropped, not bent.
