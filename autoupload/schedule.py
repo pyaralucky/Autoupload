@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from .config import ConfigError
 
 WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+CATCH_UP_HOURS = 24
 _TIME = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
 
 
@@ -108,9 +109,16 @@ def due_slot(config: dict, root: Path, now: datetime) -> datetime | None:
         state["last_slot"] = now.isoformat(timespec="seconds")
         save_state(root, state)
         return None
-    slot = latest_slot(config, now)
-    if slot and slot > datetime.fromisoformat(last):
-        return slot
+    # GitHub often runs scheduled workflows hours late, so several slots can
+    # pass between runs. Take the oldest one still owed (within the last day)
+    # so that each run posts once and none is silently dropped.
+    last_done = datetime.fromisoformat(last)
+    local = now.astimezone(timezone_of(config))
+    floor = max(last_done, now - timedelta(hours=CATCH_UP_HOURS))
+    for back in (1, 0):
+        for slot in slots_on(config, local.date() - timedelta(days=back)):
+            if floor < slot <= local:
+                return slot
     return None
 
 

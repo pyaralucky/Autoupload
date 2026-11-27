@@ -2,8 +2,10 @@ name: Post to Instagram
 
 on:
   schedule:
-    # Wakes up hourly; a post only goes out when a slot in autoupload.toml is due.
-    - cron: "7 * * * *"
+    # Wakes up every 20 minutes; a post only goes out when a slot in
+    # autoupload.toml is due. GitHub runs scheduled workflows late and skips
+    # many of them, so frequent attempts keep posts close to their slot.
+    - cron: "7,27,47 * * * *"
   workflow_dispatch:
     inputs:
       count:

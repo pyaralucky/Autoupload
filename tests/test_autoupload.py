@@ -290,6 +290,22 @@ class ConfigAndScheduleTests(TempRoot):
         schedule.mark_done(self.root, slot)
         self.assertIsNone(schedule.due_slot(self.config, self.root, start + timedelta(hours=2)))
 
+    def test_missed_slots_are_caught_up_one_per_run(self):
+        self.toml("[schedule]\nslots=['09:00','18:00']\n")
+        start = datetime(2026, 11, 16, 8, 0, tzinfo=UTC)
+        schedule.due_slot(self.config, self.root, start)  # first run starts the clock
+        late = datetime(2026, 11, 16, 23, 0, tzinfo=UTC)  # both slots passed unseen
+        first = schedule.due_slot(self.config, self.root, late)
+        self.assertEqual(first.hour, 9)
+        schedule.mark_done(self.root, first)
+        second = schedule.due_slot(self.config, self.root, late + timedelta(hours=1))
+        self.assertEqual(second.hour, 18)
+        schedule.mark_done(self.root, second)
+        self.assertIsNone(schedule.due_slot(self.config, self.root, late + timedelta(hours=2)))
+        # After a long pause only the last day's slots are owed, not a flood.
+        much_later = datetime(2026, 11, 20, 20, 0, tzinfo=UTC)
+        self.assertEqual(schedule.due_slot(self.config, self.root, much_later).day, 20)
+
     def test_bad_time(self):
         self.toml("[schedule]\nslots=['25:00']\n")
         with self.assertRaisesRegex(ConfigError, "HH:MM"):
@@ -470,6 +486,7 @@ class PostCommandTests(TempRoot):
         write_jpeg(self.queue / "01 first.jpg")
         (self.queue / "01 first.txt").write_text("cap\n@comment: first!")
         write_jpeg(self.queue / "02-second.jpg")
+        write_jpeg(self.queue / "03-third.jpg")
         self.toml("[notify]\nlow_queue=0\n")
 
     def run_post(self, web, count=1, dry_run=False, env=None, scheduled=False):
@@ -504,7 +521,7 @@ class PostCommandTests(TempRoot):
         web = FakeWeb()
         self.assertEqual(self.run_post(web, count=5, dry_run=True, env={}), 0)
         self.assertEqual(web.calls, [])
-        self.assertEqual(len(list(self.queue.iterdir())), 3)
+        self.assertEqual(len(list(self.queue.iterdir())), 4)
         self.assertFalse((self.root / "QUEUE.md").exists())
 
     def test_invalid_item_goes_to_failed_with_alert(self):
@@ -567,8 +584,10 @@ class PostCommandTests(TempRoot):
         state.write_text(json.dumps({"last_slot": old}))
         self.run_post(web, scheduled=True)
         self.assertEqual(len(self.log()), 1)
-        self.run_post(web, scheduled=True)  # same slot: nothing more
-        self.assertEqual(len(self.log()), 1)
+        self.run_post(web, scheduled=True)  # the day's other missed slot
+        self.assertEqual(len(self.log()), 2)
+        self.run_post(web, scheduled=True)  # nothing owed any more
+        self.assertEqual(len(self.log()), 2)
 
     def test_story_and_hashtag_rotation(self):
         write_jpeg(self.queue / "stories" / "00.jpg", 1080, 1920)
