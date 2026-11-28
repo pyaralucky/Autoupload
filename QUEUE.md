@@ -15,7 +15,7 @@ Newest at the top left, as the profile grid will look once everything is posted.
 
 ## Schedule
 
-### Sat 28 Nov 2026, 10:30 — auto-20261127-03-wash-before-bed.jpg
+### Sat 28 Nov 2026, 19:00 — auto-20261127-03-wash-before-bed.jpg
 
 _image_
 
@@ -27,7 +27,7 @@ _image_
 
 - Alt text: Skincare tip card reading: Never sleep with the day still on your face. Cleanse gently every night to remove sunscreen, make-up, sweat and pollution before bed.
 
-### Sat 28 Nov 2026, 19:00 — auto-20261127-04-moisturise-damp-skin.jpg
+### Sun 29 Nov 2026, 10:30 — auto-20261127-04-moisturise-damp-skin.jpg
 
 _image_
 
@@ -39,7 +39,7 @@ _image_
 
 - Alt text: Skincare tip card reading: Moisturise while your skin is still damp. Above the text is a still-life photograph of skincare items.
 
-### Sun 29 Nov 2026, 10:30 — auto-20261127-05-darker-skin-sunscreen.jpg
+### Sun 29 Nov 2026, 19:00 — auto-20261127-05-darker-skin-sunscreen.jpg
 
 _image_
 
@@ -51,7 +51,7 @@ _image_
 
 - Alt text: Card reading: Myth: Darker skin does not need sunscreen. Fact: Every skin tone needs sun protection. Sun exposure also worsens dark patches and uneven tone.
 
-### Sun 29 Nov 2026, 19:00 — auto-20261127-06-patch-test.jpg
+### Mon 30 Nov 2026, 10:30 — auto-20261127-06-patch-test.jpg
 
 _image_
 
@@ -63,7 +63,7 @@ _image_
 
 - Alt text: Skincare tip card reading: Patch test before you commit. Try a new product on a small area, such as behind the ear or the inner forearm, for a few days before using it on your whole face.
 
-### Mon 30 Nov 2026, 10:30 — auto-20261127-07-lukewarm-water.jpg
+### Mon 30 Nov 2026, 19:00 — auto-20261127-07-lukewarm-water.jpg
 
 _image_
 
@@ -75,7 +75,7 @@ _image_
 
 - Alt text: Skincare tip card reading: Wash with lukewarm water, not hot. Above the text is a still-life photograph of skincare items.
 
-### Mon 30 Nov 2026, 19:00 — auto-20261127-08-lemon-toothpaste.jpg
+### Tue 01 Dec 2026, 10:30 — auto-20261127-08-lemon-toothpaste.jpg
 
 _image_
 
@@ -87,7 +87,7 @@ _image_
 
 - Alt text: Card reading: Myth: Lemon juice or toothpaste will clear a pimple. Fact: Both can irritate and burn the skin, and may leave a dark mark behind.
 
-### Tue 01 Dec 2026, 10:30 — auto-20261127-09-neck-and-hands.jpg
+### Tue 01 Dec 2026, 19:00 — auto-20261127-09-neck-and-hands.jpg
 
 _image_
 
@@ -99,7 +99,7 @@ _image_
 
 - Alt text: Skincare tip card reading: Your neck and hands need sunscreen too. Above the text is a still-life photograph of skincare items.
 
-### Tue 01 Dec 2026, 19:00 — auto-20261127-10-dont-pick.jpg
+### Wed 02 Dec 2026, 10:30 — auto-20261127-10-dont-pick.jpg
 
 _image_
 
@@ -111,7 +111,7 @@ _image_
 
 - Alt text: Skincare tip card reading: Hands off that pimple. Squeezing pushes inflammation deeper and raises the chance of a scar or a dark mark.
 
-### Wed 02 Dec 2026, 10:30 — auto-20261127-11-scrubbing.jpg
+### Wed 02 Dec 2026, 19:00 — auto-20261127-11-scrubbing.jpg
 
 _image_
 
@@ -123,7 +123,7 @@ _image_
 
 - Alt text: Card reading: Myth: The harder you scrub, the cleaner your skin. Fact: Harsh scrubbing damages the skin barrier and can cause redness and more breakouts.
 
-### Wed 02 Dec 2026, 19:00 — auto-20261127-12-fresh-pillowcase.jpg
+### Thu 03 Dec 2026, 10:30 — auto-20261127-12-fresh-pillowcase.jpg
 
 _image_
 
@@ -135,7 +135,7 @@ _image_
 
 - Alt text: Skincare tip card reading: Change your pillowcase every week. Above the text is a still-life photograph of skincare items.
 
-### Thu 03 Dec 2026, 10:30 — auto-20261127-13-one-product-at-a-time.jpg
+### Thu 03 Dec 2026, 19:00 — auto-20261127-13-one-product-at-a-time.jpg
 
 _image_
 
@@ -147,7 +147,7 @@ _image_
 
 - Alt text: Skincare tip card reading: Add one new product at a time. Give each new product two to three weeks before adding another, so you know what is helping and what is not.
 
-### Thu 03 Dec 2026, 19:00 — auto-20261127-14-acne-dirty-skin.jpg
+### Fri 04 Dec 2026, 10:30 — auto-20261127-14-acne-dirty-skin.jpg
 
 _image_
 
