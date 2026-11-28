@@ -288,22 +288,37 @@ def _reachable_accounts(env: dict, session) -> None:
     if "graph.instagram.com" in base:
         return
     version = env.get("IG_API_VERSION") or DEFAULT_API_VERSION
+    token = env["IG_ACCESS_TOKEN"]
+    graph = GraphAPI(f"{base}/{version}", token, session=session)
+    ids: list[str] = []
     try:
-        pages = GraphAPI(f"{base}/{version}", env["IG_ACCESS_TOKEN"], session=session).call(
-            "GET", "me/accounts", fields="name,instagram_business_account{id,username}", limit="100"
-        ).get("data", [])
-    except InstagramError as exc:
-        print(f"(could not list accounts: {exc})")
+        # The token records exactly which accounts the owner ticked.
+        data = graph.call("GET", "debug_token", input_token=token).get("data", {})
+        for grant in data.get("granular_scopes") or []:
+            if grant.get("scope") in ("instagram_content_publish", "instagram_basic"):
+                ids += [i for i in grant.get("target_ids") or [] if i not in ids]
+    except InstagramError:
+        pass
+    if not ids:
+        try:
+            pages = graph.call(
+                "GET", "me/accounts", fields="instagram_business_account{id}", limit="100"
+            ).get("data", [])
+            ids = [p["instagram_business_account"]["id"] for p in pages
+                   if p.get("instagram_business_account")]
+        except InstagramError:
+            pass
+    if not ids:
+        print("(could not list the accounts this token covers)")
         return
     print("Instagram accounts this token can post to:")
-    for page in pages:
-        account = page.get("instagram_business_account")
-        if account:
-            # Spaced out so the log's secret masking cannot hide the number.
-            digits = " ".join(str(account["id"]))
-            print(f"  @{account.get('username', '?')}  user_id: {digits}  (Page: {page.get('name', '?')})")
-        else:
-            print(f"  (Page '{page.get('name', '?')}' has no Instagram account linked)")
+    for account_id in ids:
+        try:
+            name = "@" + graph.call("GET", account_id, fields="username").get("username", "?")
+        except InstagramError:
+            name = "(name unavailable)"
+        # Spaced out so the log's secret masking cannot hide the number.
+        print(f"  {name}  user_id: {' '.join(str(account_id))}")
 
 
 def cmd_prepare(args, env, session) -> int:
