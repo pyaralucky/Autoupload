@@ -99,11 +99,23 @@ Each one spends the owner's credits, so:
   make text cards instead and say so in the pull request;
 - generate one picture per image card, no variations or retries for taste.
 
-What the pictures show: calm, clean still-life and ambience, such as
+What the pictures show depends on the kind of post.
+
+For **treatment explainers**, the owner wants the treatment itself shown:
+a realistic photograph of the equipment in use by a dermatologist in a
+bright, modern clinic (for example a laser handpiece held against a
+patient's leg, with the machine beside the bed). Compose it around the
+gloved hands, the device and the treated area. The clinician is seen from
+the side or partly out of frame, with safety eyewear where the procedure
+calls for it; the patient's face is not in frame.
+
+For **tips and other posts**: calm, clean still-life and ambience, such as
 unbranded skincare bottles and jars, cream textures, botanicals, water,
-soft fabrics, a tidy clinic interior. What they never show: faces or
-identifiable people, skin conditions, wounds, needles or procedures in
-progress, before/after pairs, brand names, or any text or lettering.
+soft fabrics, a tidy clinic interior.
+
+What no picture shows: a recognisable face as the subject, skin disease or
+wounds, blood, needles entering skin, before/after pairs, brand names on
+products or machines, or any text or lettering.
 
 Download the picture to a temporary folder outside the repository, use it
 with `--image`, and do not commit the original.
