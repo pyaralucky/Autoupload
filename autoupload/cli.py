@@ -321,6 +321,28 @@ def _reachable_accounts(env: dict, session) -> None:
         print(f"  {name}  user_id: {' '.join(str(account_id))}")
 
 
+def cmd_lookup(args, env, session) -> int:
+    """Find another professional account's user id from its handle."""
+    client = make_client(env, session)
+    handle = args.handle.lstrip("@")
+    info = client.call(
+        "GET", client.user_id, fields=f"business_discovery.username({handle}){{id,username}}"
+    ).get("business_discovery", {})
+    # Spaced out so the log's secret masking cannot hide the number.
+    print(f"@{info.get('username', handle)}  user_id: {' '.join(str(info.get('id', '?')))}")
+    try:
+        other = InstagramClient(
+            str(info["id"]), env["IG_ACCESS_TOKEN"],
+            api_base=env.get("IG_API_BASE") or DEFAULT_API_BASE,
+            api_version=env.get("IG_API_VERSION") or DEFAULT_API_VERSION, session=session,
+        )
+        other.account()
+        print("The current token CAN manage this account.")
+    except (InstagramError, KeyError) as exc:
+        print(f"The current token can NOT manage this account yet: {exc}")
+    return 0
+
+
 def cmd_prepare(args, env, session) -> int:
     from . import prepare, preview
 
@@ -599,6 +621,9 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("list", help="show the queue and validate it").set_defaults(func=cmd_list)
     sub.add_parser("check", help="verify the credentials").set_defaults(func=cmd_check)
+    lookup = sub.add_parser("lookup", help="find an account's user id from its handle")
+    lookup.add_argument("handle")
+    lookup.set_defaults(func=cmd_lookup)
     sub.add_parser("preview", help="write QUEUE.md").set_defaults(func=cmd_preview)
     sub.add_parser("insights", help="write reports/insights.md").set_defaults(func=cmd_insights)
     refresh = sub.add_parser("refresh-token", help="renew the Instagram access token")
