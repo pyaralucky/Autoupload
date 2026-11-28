@@ -34,6 +34,13 @@ voice = ""                  # describe your style, e.g. "Warm, short, first pers
 facebook = false            # also publish to a Facebook Page
 threads = false             # also publish to Threads
 
+# More than one Instagram account. Posts in queue/ go to every account listed;
+# posts in queue/@NAME/ go to that account only. With no [accounts] section
+# there is a single account, taken from the IG_USER_ID secret.
+# [accounts.clinic]                 # uses the IG_USER_ID secret
+# [accounts.doctor]
+# user_id = "17841400000000000"     # that account's Instagram user id (not secret)
+
 [brand]                     # used on the graphic cards (`python -m autoupload card`)
 name = "Revival Skin Clinic"          # default ""
 handle = "@revivalskinclinic"         # default ""

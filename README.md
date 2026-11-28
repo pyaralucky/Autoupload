@@ -200,6 +200,26 @@ day.
 post with its estimated time, final caption, first comment and any problems.
 GitHub renders it with the images.
 
+## Several Instagram accounts
+
+List the accounts under `[accounts]` in `autoupload.toml`:
+
+```toml
+[accounts.clinic]                # the original account (IG_USER_ID secret)
+[accounts.doctor]
+user_id = "17841400000000000"    # the second account's Instagram user id
+```
+
+- Posts in `queue/` go to **every** account.
+- Posts in `queue/@doctor/` go to **that account only**. A line
+  `@account: doctor` in a caption file does the same for a single post.
+- Each posting slot publishes one item, whoever it is for.
+- One access token covers all accounts if it was generated with every
+  account ticked in Meta's consent screen. An account with a separate token
+  sets `token_secret = "NAME_OF_SECRET"`.
+- If a shared post reaches the first account but fails on another, it is not
+  retried (that would post it twice on the first); you get an alert instead.
+
 ## Posts created by Claude
 
 A scheduled Claude task prepares posts for the clinic (skincare tips, myth
