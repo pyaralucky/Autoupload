@@ -49,8 +49,9 @@ MAX_CAPTION_CHARS = 2200
 MAX_HASHTAGS = 30
 MAX_CAROUSEL = 10
 STORIES_DIR = "stories"
+ACCOUNT_PREFIX = "@"
 
-_DIRECTIVE = re.compile(r"^@(alt|location|comment|crosspost):\s*(.*)$", re.IGNORECASE)
+_DIRECTIVE = re.compile(r"^@(alt|location|comment|crosspost|account):\s*(.*)$", re.IGNORECASE)
 _DATE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})(?:[-_T](\d{2})(\d{2}))?(?=[-_ .]|$)")
 
 
@@ -65,6 +66,7 @@ class Item:
     location: str = ""
     comment: str = ""
     crosspost: bool = True
+    accounts: list[str] | None = None  # None: every account
     has_caption_file: bool = False
     not_before: datetime | None = None  # naive, in the schedule's timezone
     problems: list[str] = field(default_factory=list)  # can never be posted as is
@@ -167,6 +169,8 @@ def _read_caption(item: Item, default: str) -> None:
             item.location = value
         elif key == "comment":
             item.comment = f"{item.comment}\n{value}".strip()
+        elif key == "account":
+            item.accounts = [v.strip().lstrip("@") for v in value.split(",") if v.strip()]
         elif key == "crosspost":
             item.crosspost = value.lower() not in ("off", "no", "false", "0")
     item.caption = "\n".join(body).strip()
@@ -236,37 +240,56 @@ def _check_caption(item: Item, config: dict) -> None:
         item.problems.append(f"caption has {most_tags} hashtags (max {MAX_HASHTAGS})")
 
 
-def load_queue(queue_dir: Path, config: dict) -> list[Item]:
-    """All queued items in filename order, each with its validation results."""
-    if not queue_dir.is_dir():
-        return []
+def _scan(folder: Path, prefix: str, only: list[str] | None) -> list[Item]:
+    """Items directly inside ``folder`` (and its stories/ subfolder)."""
     items: list[Item] = []
-    for entry in sorted(queue_dir.iterdir(), key=lambda p: p.name.lower()):
+    for entry in sorted(folder.iterdir(), key=lambda p: p.name.lower()):
         if _is_hidden(entry):
             continue
         suffix = entry.suffix.lower()
+        name = f"{prefix}{entry.name}"
+        if entry.is_dir() and entry.name.startswith(ACCOUNT_PREFIX) and not prefix:
+            # queue/@name/: posts for that one account only
+            items += _scan(entry, f"{entry.name}/", [entry.name[len(ACCOUNT_PREFIX):]])
+            continue
         if entry.is_dir() and entry.name.lower() == STORIES_DIR:
-            for file in _visible_files(entry):
-                if file.suffix.lower() in MEDIA_SUFFIXES:
-                    items.append(_single(file, "story", f"{entry.name}/{file.name}"))
+            found = [
+                _single(file, "story", f"{name}/{file.name}")
+                for file in _visible_files(entry)
+                if file.suffix.lower() in MEDIA_SUFFIXES
+            ]
         elif entry.is_dir():
             media = [p for p in _visible_files(entry) if p.suffix.lower() in MEDIA_SUFFIXES]
             if len(media) == 1:
                 kind = "reel" if is_video(media[0]) else "image"
             else:
                 kind = "carousel"
-            item = Item(name=entry.name, kind=kind, media=media, paths=[entry])
+            item = Item(name=name, kind=kind, media=media, paths=[entry])
             if not media:
                 item.problems.append("folder contains no images or videos")
             elif len(media) > MAX_CAROUSEL:
                 item.problems.append(
                     f"{len(media)} files; a carousel allows at most {MAX_CAROUSEL}"
                 )
-            items.append(item)
+            found = [item]
         elif suffix in IMAGE_SUFFIXES:
-            items.append(_single(entry, "image", entry.name))
+            found = [_single(entry, "image", name)]
         elif suffix in VIDEO_SUFFIXES:
-            items.append(_single(entry, "reel", entry.name))
+            found = [_single(entry, "reel", name)]
+        else:
+            found = []
+        for item in found:
+            item.accounts = only
+        items += found
+    return items
+
+
+def load_queue(queue_dir: Path, config: dict) -> list[Item]:
+    """All queued items in filename order, each with its validation results."""
+    if not queue_dir.is_dir():
+        return []
+    items = _scan(queue_dir, "", None)
+    known = set(config.get("accounts") or {})
 
     items.sort(key=lambda i: i.name.rsplit("/", 1)[-1].lower())
     for item in items:
@@ -277,6 +300,11 @@ def load_queue(queue_dir: Path, config: dict) -> list[Item]:
         for path in item.media[:MAX_CAROUSEL]:
             _check_media(item, path)
         _check_caption(item, config)
+        unknown = [a for a in item.accounts or [] if a not in known]
+        if unknown:
+            item.problems.append(
+                f"account '{unknown[0]}' is not defined under [accounts] in autoupload.toml"
+            )
     return items
 
 

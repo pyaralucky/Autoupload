@@ -39,9 +39,10 @@ def _thumb(item: Item, root: Path, width: int) -> str:
 
 
 def _label(item: Item) -> str:
-    if item.kind == "carousel":
-        return f"carousel × {len(item.media)}"
-    return item.kind
+    kind = f"carousel × {len(item.media)}" if item.kind == "carousel" else item.kind
+    if item.accounts:
+        kind += " · only " + ", ".join(f"@{a}" for a in item.accounts)
+    return kind
 
 
 def render(root: Path, config: dict, now: datetime) -> str:

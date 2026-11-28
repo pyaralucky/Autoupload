@@ -105,6 +105,33 @@ def make_client(env: dict, session) -> InstagramClient:
     )
 
 
+def make_clients(config: dict, env: dict, session) -> dict[str, InstagramClient]:
+    """One client per Instagram account, in the order they are configured."""
+    accounts = config.get("accounts") or {}
+    if not accounts:
+        return {"main": make_client(env, session)}
+    clients = {}
+    for name, spec in accounts.items():
+        if not isinstance(spec, dict):
+            raise ConfigError(f"autoupload.toml: [accounts.{name}] must be a table")
+        id_secret = spec.get("user_id_secret", "IG_USER_ID")
+        token_secret = spec.get("token_secret", "IG_ACCESS_TOKEN")
+        user_id = str(spec.get("user_id") or env.get(id_secret) or "")
+        token = env.get(token_secret) or ""
+        if not user_id:
+            raise ConfigError(f"Account '{name}': no user_id set and secret {id_secret} is empty")
+        if not token:
+            raise ConfigError(f"Account '{name}': secret {token_secret} is empty")
+        clients[name] = InstagramClient(
+            user_id,
+            token,
+            api_base=env.get("IG_API_BASE") or DEFAULT_API_BASE,
+            api_version=env.get("IG_API_VERSION") or DEFAULT_API_VERSION,
+            session=session,
+        )
+    return clients
+
+
 def describe(item: Item) -> str:
     kind = f"carousel of {len(item.media)}" if item.kind == "carousel" else item.kind
     caption = item.caption.replace("\n", " ")
@@ -229,21 +256,54 @@ def cmd_list(args, env, session) -> int:
 
 def cmd_check(args, env, session) -> int:
     config = settings(args.root, env)
-    client = make_client(env, session)
-    try:
-        info = client.account()
-    except InstagramError as exc:
-        print(f"Instagram credentials do NOT work: {exc}")
+    clients = make_clients(config, env, session)
+    failed = 0
+    for name, client in clients.items():
+        label = "" if name == "main" else f" [{name}]"
+        try:
+            info = client.account()
+        except InstagramError as exc:
+            print(f"Instagram credentials{label} do NOT work: {exc}")
+            failed += 1
+            continue
+        print(f"Instagram credentials{label} OK: @{info.get('username', '?')}")
+    if failed:
         _diagnose(env, session)
         return 2
-    print(f"Instagram credentials OK: @{info.get('username', '?')} (id {info.get('id')})")
     _token_details(env, session)
+    _reachable_accounts(env, session)
     active = crosspost.targets(config, env, session)
     for name, wanted in config["crosspost"].items():
         if wanted:
             state = "credentials present" if name in active else "enabled but credentials missing"
             print(f"Cross-post to {name}: {state}")
     return 0
+
+
+def _reachable_accounts(env: dict, session) -> None:
+    """List every Instagram account this Facebook Login token can post to."""
+    from .instagram import GraphAPI
+
+    base = (env.get("IG_API_BASE") or DEFAULT_API_BASE).rstrip("/")
+    if "graph.instagram.com" in base:
+        return
+    version = env.get("IG_API_VERSION") or DEFAULT_API_VERSION
+    try:
+        pages = GraphAPI(f"{base}/{version}", env["IG_ACCESS_TOKEN"], session=session).call(
+            "GET", "me/accounts", fields="name,instagram_business_account{id,username}", limit="100"
+        ).get("data", [])
+    except InstagramError as exc:
+        print(f"(could not list accounts: {exc})")
+        return
+    print("Instagram accounts this token can post to:")
+    for page in pages:
+        account = page.get("instagram_business_account")
+        if account:
+            # Spaced out so the log's secret masking cannot hide the number.
+            digits = " ".join(str(account["id"]))
+            print(f"  @{account.get('username', '?')}  user_id: {digits}  (Page: {page.get('name', '?')})")
+        else:
+            print(f"  (Page '{page.get('name', '?')}' has no Instagram account linked)")
 
 
 def cmd_prepare(args, env, session) -> int:
@@ -293,7 +353,7 @@ def cmd_preview(args, env, session) -> int:
 def cmd_insights(args, env, session) -> int:
     from . import insights
 
-    path = insights.write_report(make_client(env, session), args.root, settings(args.root, env))
+    path = insights.write_report(next(iter(make_clients(settings(args.root, env), env, session).values())), args.root, settings(args.root, env))
     print(f"Wrote {path}")
     return 0
 
@@ -317,26 +377,45 @@ def cmd_refresh_token(args, env, session) -> int:
     return 0
 
 
-def _publish_item(item, client, extra, config, env, session, root, base, index) -> dict:
+def _publish_item(item, clients, extra, config, env, session, root, base, index) -> dict:
     """Publish one item everywhere. Returns the log record."""
     caption, comment = compose_caption(item, config, index)
     media = [(media_url(base, root, p), is_video(p)) for p in item.media]
     for url, _ in media:
         check_reachable(url, session)
     post = Post(item.kind, media, caption, item.alt, item.location)
-    media_id = client.publish(post)
+    targets = [n for n in clients if item.accounts is None or n in item.accounts]
+    if not targets:
+        raise MediaRejected(f"no configured account matches {item.accounts}")
 
     warnings = []
-    try:
-        link = client.permalink(media_id)
-    except InstagramError:
-        link = None  # the post is live; a missing link must not undo that
-    record = {"media_id": media_id, "permalink": link}
-    if comment:
+    record: dict = {"accounts": {}}
+    for position, name in enumerate(targets):
+        client = clients[name]
         try:
-            client.comment(media_id, comment)
+            media_id = client.publish(post)
         except InstagramError as exc:
-            warnings.append(f"first comment: {exc}")
+            if position == 0:
+                raise  # nothing is live yet: keep the item queued and retry
+            # Already live on an earlier account; retrying would post it twice.
+            warnings.append(f"account {name}: {exc}")
+            continue
+        try:
+            link = client.permalink(media_id)
+        except InstagramError:
+            link = None  # the post is live; a missing link must not undo that
+        record["accounts"][name] = {"media_id": media_id, "permalink": link}
+        if position == 0:
+            record["media_id"], record["permalink"] = media_id, link
+        elif link:
+            print(f"  also on account {name}: {link}")
+        if comment:
+            try:
+                client.comment(media_id, comment)
+            except InstagramError as exc:
+                warnings.append(f"first comment ({name}): {exc}")
+    if len(clients) == 1:
+        del record["accounts"]
     if item.crosspost and item.kind != "story":
         for name, target in extra.items():
             try:
@@ -373,7 +452,7 @@ def cmd_post(args, env, session) -> int:
     if not ready:
         print("Nothing to post: the queue is empty or everything is held for a later date.")
 
-    client = None if args.dry_run else make_client(env, session)
+    clients = {} if args.dry_run else make_clients(config, env, session)
     extra = {} if args.dry_run else crosspost.targets(config, env, session)
     base = None
     posted = 0
@@ -403,7 +482,7 @@ def cmd_post(args, env, session) -> int:
         base = base or public_base_url(env)
         try:
             record = _publish_item(
-                item, client, extra, config, env, session, root, base, posted_count(root)
+                item, clients, extra, config, env, session, root, base, posted_count(root)
             )
         except MediaRejected as exc:
             print(f"REJECTED {item.name}: {exc}")

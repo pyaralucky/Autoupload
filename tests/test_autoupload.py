@@ -112,10 +112,12 @@ class FakeWeb:
         if path == "page1/videos":
             return FakeResponse(body={"id": "vid9"})
 
-        if path == "42/media":
+        if path in ("42/media", "43/media"):
             return FakeResponse(body={"id": self._id("c")})
         if path == "42/media_publish":
             return FakeResponse(body={"id": "m1"})
+        if path == "43/media_publish":
+            return FakeResponse(body={"id": "m2"})
         if path.endswith("/comments"):
             return FakeResponse(body={"id": "cm1"})
         if path.endswith("/insights"):
@@ -605,6 +607,39 @@ class PostCommandTests(TempRoot):
             self.assertGreater(claimed, now)
             later = now + timedelta(minutes=20)
             self.assertIsNone(schedule.due_slot(self.config, self.root, later))
+
+    def test_two_accounts_shared_and_own_posts(self):
+        self.toml(
+            "[accounts.clinic]\n[accounts.doctor]\nuser_id='43'\n[notify]\nlow_queue=0\n"
+        )
+        write_jpeg(self.queue / "@doctor" / "00-own.jpg")
+        (self.queue / "@doctor" / "00-own.txt").write_text("mine")
+        write_jpeg(self.queue / "@nobody" / "zz.jpg")
+        items = {i.name: i for i in load_queue(self.queue, self.config)}
+        self.assertEqual(items["@doctor/00-own.jpg"].accounts, ["doctor"])
+        self.assertIn("not defined", items["@nobody/zz.jpg"].problems[0])
+        (self.queue / "@nobody" / "zz.jpg").unlink()
+
+        web = FakeWeb()
+        self.run_post(web, count=2)
+        publishes = [p for p in web.paths("POST") if p.endswith("media_publish")]
+        # the doctor-only post goes to 43; the shared post goes to both
+        self.assertEqual(publishes, ["43/media_publish", "42/media_publish", "43/media_publish"])
+        own, shared = self.log()
+        self.assertEqual(list(own["accounts"]), ["doctor"])
+        self.assertEqual(shared["media_id"], "m1")
+        self.assertEqual(shared["accounts"]["doctor"]["media_id"], "m2")
+        self.assertEqual(sum(p.endswith("/comments") for p in web.paths("POST")), 2)
+
+    def test_second_account_failure_does_not_requeue(self):
+        self.toml("[accounts.clinic]\n[accounts.doctor]\nuser_id='43'\n[notify]\nlow_queue=0\n")
+        web = FakeWeb()
+        web.fail.add("43/media")
+        self.run_post(web)
+        entry = self.log()[0]
+        self.assertEqual(entry["media_id"], "m1")
+        self.assertIn("account doctor", entry["warnings"][0])
+        self.assertFalse((self.queue / "01 first.jpg").exists())
 
     def test_story_and_hashtag_rotation(self):
         write_jpeg(self.queue / "stories" / "00.jpg", 1080, 1920)

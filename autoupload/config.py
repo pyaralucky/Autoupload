@@ -33,6 +33,9 @@ DEFAULTS: dict = {
         "language": "English",
     },
     "crosspost": {"facebook": False, "threads": False},
+    # Instagram accounts, e.g. {"clinic": {"user_id": "1784..."}}. Empty means
+    # one account taken from the IG_USER_ID secret.
+    "accounts": {},
     "brand": {
         "name": "",
         "handle": "",
