@@ -6,8 +6,10 @@ on:
     # autoupload.toml is due. GitHub runs scheduled workflows late and skips
     # many of them, so frequent attempts keep posts close to their slot.
     - cron: "7,27,47 * * * *"
-  # Changing the file below publishes one post straight away. It exists so a
-  # post can be started by a commit when the Run workflow button is not to hand.
+  # Changing the file below publishes one post straight away. If its first
+  # line is "mode: slot" the post counts as the scheduled slot that is due
+  # (used by the Claude task that acts as a reliable clock); with
+  # "mode: extra" it is an additional post.
   push:
     paths: [".github/post-now"]
   workflow_dispatch:
@@ -72,6 +74,9 @@ jobs:
         run: |
           if [ "$EVENT" = "schedule" ]; then
             python -m autoupload post --scheduled
+          elif [ "$EVENT" = "push" ] && grep -q '^mode: slot' .github/post-now; then
+            # An outside clock standing in for the scheduler.
+            python -m autoupload post --count 1 --claim-slot
           else
             python -m autoupload post --count "$COUNT" $DRY_RUN
           fi

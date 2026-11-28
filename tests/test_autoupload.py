@@ -589,6 +589,23 @@ class PostCommandTests(TempRoot):
         self.run_post(web, scheduled=True)  # nothing owed any more
         self.assertEqual(len(self.log()), 2)
 
+    def test_claim_slot_stops_the_scheduler_posting_again(self):
+        now = datetime.now(UTC)
+        soon = (now + timedelta(minutes=10)).strftime("%H:%M")
+        self.toml(f"[schedule]\nslots=['{soon}']\n[notify]\nlow_queue=0\n")
+        state = self.root / "posted" / "state.json"
+        state.parent.mkdir()
+        state.write_text(json.dumps({"last_slot": (now - timedelta(days=3)).isoformat()}))
+        web = FakeWeb()
+        args = SimpleNamespace(root=self.root, count=1, dry_run=False, scheduled=False, claim_slot=True)
+        cli.cmd_post(args, self.ENV, web)
+        self.assertEqual(len(self.log()), 1)
+        if (now + timedelta(minutes=10)).date() == now.date():  # not straddling midnight
+            claimed = datetime.fromisoformat(json.loads(state.read_text())["last_slot"])
+            self.assertGreater(claimed, now)
+            later = now + timedelta(minutes=20)
+            self.assertIsNone(schedule.due_slot(self.config, self.root, later))
+
     def test_story_and_hashtag_rotation(self):
         write_jpeg(self.queue / "stories" / "00.jpg", 1080, 1920)
         self.toml("[caption]\nhashtag_sets=[['#a'],['#b']]\n[notify]\nlow_queue=0\n")

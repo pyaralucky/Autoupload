@@ -7,7 +7,7 @@ import os
 import random
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
 
@@ -35,6 +35,7 @@ from .queue import (
 )
 
 _sleep = time.sleep
+CLAIM_WINDOW_MINUTES = 30
 
 
 def load_dotenv(path: Path) -> None:
@@ -418,6 +419,14 @@ def cmd_post(args, env, session) -> int:
 
     if slot is not None:
         schedule.mark_done(root, slot)
+    elif getattr(args, "claim_slot", False) and not args.dry_run:
+        # Started by an outside clock just before a slot: count this run as
+        # that slot, so the scheduled check does not post for it again.
+        claimed = schedule.latest_slot(config, now + timedelta(minutes=CLAIM_WINDOW_MINUTES))
+        last = schedule.load_state(root).get("last_slot")
+        if claimed and (last is None or claimed > datetime.fromisoformat(last)):
+            schedule.mark_done(root, claimed)
+            print(f"Counted as the {claimed:%a %H:%M %Z} slot.")
 
     remaining = [i for i in items if i.name not in done]
     usable = [i for i in remaining if not i.problems]
@@ -472,6 +481,11 @@ def main(argv: list[str] | None = None) -> int:
         "--scheduled",
         action="store_true",
         help="only post if a slot from autoupload.toml has come due",
+    )
+    post.add_argument(
+        "--claim-slot",
+        action="store_true",
+        help="post now and count it as the slot due within the next 30 minutes",
     )
     post.set_defaults(func=cmd_post)
 
