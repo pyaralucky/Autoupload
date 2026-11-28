@@ -1,16 +1,17 @@
 # Upcoming posts
 
-12 queued. Times are estimates in Asia/Kolkata.
+14 queued. Times are estimates in Asia/Kolkata.
 
 ## Grid
 
 Newest at the top left, as the profile grid will look once everything is posted.
 
 <table>
-<tr><td><img src="queue/auto-20261127-14-acne-dirty-skin.jpg" width="220" alt="auto-20261127-14-acne-dirty-skin.jpg"></td><td><img src="queue/auto-20261127-13-one-product-at-a-time.jpg" width="220" alt="auto-20261127-13-one-product-at-a-time.jpg"></td><td><img src="queue/auto-20261127-12-fresh-pillowcase.jpg" width="220" alt="auto-20261127-12-fresh-pillowcase.jpg"></td></tr>
-<tr><td><img src="queue/auto-20261127-11-scrubbing.jpg" width="220" alt="auto-20261127-11-scrubbing.jpg"></td><td><img src="queue/auto-20261127-10-dont-pick.jpg" width="220" alt="auto-20261127-10-dont-pick.jpg"></td><td><img src="queue/auto-20261127-09-neck-and-hands.jpg" width="220" alt="auto-20261127-09-neck-and-hands.jpg"></td></tr>
-<tr><td><img src="queue/auto-20261127-08-lemon-toothpaste.jpg" width="220" alt="auto-20261127-08-lemon-toothpaste.jpg"></td><td><img src="queue/auto-20261127-07-lukewarm-water.jpg" width="220" alt="auto-20261127-07-lukewarm-water.jpg"></td><td><img src="queue/auto-20261127-06-patch-test.jpg" width="220" alt="auto-20261127-06-patch-test.jpg"></td></tr>
-<tr><td><img src="queue/auto-20261127-05-darker-skin-sunscreen.jpg" width="220" alt="auto-20261127-05-darker-skin-sunscreen.jpg"></td><td><img src="queue/auto-20261127-04-moisturise-damp-skin.jpg" width="220" alt="auto-20261127-04-moisturise-damp-skin.jpg"></td><td><img src="queue/auto-20261127-03-wash-before-bed.jpg" width="220" alt="auto-20261127-03-wash-before-bed.jpg"></td></tr>
+<tr><td><img src="queue/auto-20261128-02-laser-hair-reduction.jpg" width="220" alt="auto-20261128-02-laser-hair-reduction.jpg"></td><td><img src="queue/auto-20261128-01-chemical-peels.jpg" width="220" alt="auto-20261128-01-chemical-peels.jpg"></td><td><img src="queue/auto-20261127-14-acne-dirty-skin.jpg" width="220" alt="auto-20261127-14-acne-dirty-skin.jpg"></td></tr>
+<tr><td><img src="queue/auto-20261127-13-one-product-at-a-time.jpg" width="220" alt="auto-20261127-13-one-product-at-a-time.jpg"></td><td><img src="queue/auto-20261127-12-fresh-pillowcase.jpg" width="220" alt="auto-20261127-12-fresh-pillowcase.jpg"></td><td><img src="queue/auto-20261127-11-scrubbing.jpg" width="220" alt="auto-20261127-11-scrubbing.jpg"></td></tr>
+<tr><td><img src="queue/auto-20261127-10-dont-pick.jpg" width="220" alt="auto-20261127-10-dont-pick.jpg"></td><td><img src="queue/auto-20261127-09-neck-and-hands.jpg" width="220" alt="auto-20261127-09-neck-and-hands.jpg"></td><td><img src="queue/auto-20261127-08-lemon-toothpaste.jpg" width="220" alt="auto-20261127-08-lemon-toothpaste.jpg"></td></tr>
+<tr><td><img src="queue/auto-20261127-07-lukewarm-water.jpg" width="220" alt="auto-20261127-07-lukewarm-water.jpg"></td><td><img src="queue/auto-20261127-06-patch-test.jpg" width="220" alt="auto-20261127-06-patch-test.jpg"></td><td><img src="queue/auto-20261127-05-darker-skin-sunscreen.jpg" width="220" alt="auto-20261127-05-darker-skin-sunscreen.jpg"></td></tr>
+<tr><td><img src="queue/auto-20261127-04-moisturise-damp-skin.jpg" width="220" alt="auto-20261127-04-moisturise-damp-skin.jpg"></td><td><img src="queue/auto-20261127-03-wash-before-bed.jpg" width="220" alt="auto-20261127-03-wash-before-bed.jpg"></td></tr>
 </table>
 
 ## Schedule
@@ -158,3 +159,31 @@ _image_
 > #acne #acnemyths #skincaremyths #mythvsfact #acnecare #dermatology
 
 - Alt text: Card reading: Myth: Acne means your skin is dirty. Fact: Acne is driven by oil, hormones and blocked pores, not by poor hygiene.
+
+### Fri 04 Dec 2026, 19:00 — auto-20261128-01-chemical-peels.jpg
+
+_image_
+
+<img src="queue/auto-20261128-01-chemical-peels.jpg" width="320" alt="auto-20261128-01-chemical-peels.jpg">
+
+> A chemical peel uses a carefully chosen solution to remove the outer layers of skin, so that fresher skin can come through. Peels are used for concerns such as dullness, uneven tone, some kinds of pigmentation and acne.
+> 
+> A session is usually short. Some redness, dryness or flaking in the days after is common, and sun protection afterwards is essential. Peels vary in strength, and not every peel suits every skin, so a dermatologist should assess your skin first and choose the right one.
+> 
+> #chemicalpeel #skintreatment #pigmentation #acnecare #skinclinic #dermatology
+
+- Alt text: Treatment explained card reading: Chemical peels: what they are and what to expect. Above the text is a still-life photograph of a small glass bowl, a brush and a dropper bottle.
+
+### Sat 05 Dec 2026, 10:30 — auto-20261128-02-laser-hair-reduction.jpg
+
+_image_
+
+<img src="queue/auto-20261128-02-laser-hair-reduction.jpg" width="320" alt="auto-20261128-02-laser-hair-reduction.jpg">
+
+> Laser hair reduction uses light that is absorbed by the pigment in the hair. The heat it produces damages the hair follicle, so hair grows back finer and more slowly.
+> 
+> Because hair grows in cycles, treatment is done over several sessions spaced weeks apart, and occasional maintenance sessions may be needed. Results vary with hair colour, skin tone and hormones. A dermatologist should assess your skin and hair first to plan safe settings for you.
+> 
+> #laserhairreduction #laserhairremoval #unwantedhair #skinclinic #dermatology #skincare
+
+- Alt text: Treatment explained card reading: Laser hair reduction: how it works. Above the text is a picture of a dermatologist in gloves and safety goggles holding a laser handpiece against a patient's lower leg, with the laser machine beside the bed.
