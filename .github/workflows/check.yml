@@ -1,7 +1,7 @@
 name: Check credentials
 
 # Confirms the Instagram secrets work and suggests fixes. Run it by hand from the Actions tab;
-# it also runs whenever this file changes (last requested 2026-11-28, c).
+# it also runs whenever this file changes (last requested 2026-11-28, d).
 on:
   workflow_dispatch:
   push:
@@ -27,6 +27,4 @@ jobs:
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
           IG_API_BASE: ${{ vars.IG_API_BASE }}
           IG_API_VERSION: ${{ vars.IG_API_VERSION }}
-        run: |
-          python -m autoupload check
-          python -m autoupload lookup baripada_skinclinic || true
+        run: python -m autoupload check
