@@ -16,3 +16,5 @@ Claude adds a line here for every post it creates, so topics are not repeated.
 - 2026-11-27 | Skincare tip | Change your pillowcase every week
 - 2026-11-27 | Skincare tip | Add one new product at a time
 - 2026-11-27 | Myth vs fact | Acne means your skin is dirty
+- 2026-11-28 | Treatment explained | Chemical peels
+- 2026-11-28 | Treatment explained | Laser hair reduction
